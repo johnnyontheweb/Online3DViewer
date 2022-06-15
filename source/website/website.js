@@ -178,7 +178,8 @@ export class Website
         this.model = importResult.model;
         this.parameters.fileNameDiv.innerHTML = importResult.mainFile;
         this.viewer.SetMainObject (threeObject);
-        this.viewer.SetUpVector (Direction.Y, false);
+        this.viewer.SetUpVector (Direction.Z, false);
+        this.viewer.showEdges = true;
         this.navigator.FillTree (importResult);
         this.UpdateSidebar ();
         this.FitModelToWindow (true);
@@ -532,26 +533,26 @@ export class Website
 
         let importer = this.modelLoaderUI.GetImporter ();
 
-        AddButton (this.toolbar, 'open', 'Open model from your device', [], () => {
-            this.OpenFileBrowserDialog ();
-        });
-        AddButton (this.toolbar, 'open_url', 'Open model from a url', [], () => {
-            ShowOpenUrlDialog ((urls) => {
-                if (urls.length > 0) {
-                    this.hashHandler.SetModelFilesToHash (urls);
-                }
-            });
-        });
-        AddSeparator (this.toolbar, ['only_on_model']);
+        // AddButton (this.toolbar, 'open', 'Open model from your device', [], () => {
+        //     this.OpenFileBrowserDialog ();
+        // });
+        // AddButton (this.toolbar, 'open_url', 'Open model from a url', [], () => {
+        //     ShowOpenUrlDialog ((urls) => {
+        //         if (urls.length > 0) {
+        //             this.hashHandler.SetModelFilesToHash (urls);
+        //         }
+        //     });
+        // });
+        // AddSeparator (this.toolbar, ['only_on_model']);
         AddButton (this.toolbar, 'fit', 'Fit model to window', ['only_on_model'], () => {
             this.FitModelToWindow (false);
         });
-        AddButton (this.toolbar, 'up_y', 'Set Y axis as up vector', ['only_on_model'], () => {
-            this.viewer.SetUpVector (Direction.Y, true);
-        });
-        AddButton (this.toolbar, 'up_z', 'Set Z axis as up vector', ['only_on_model'], () => {
-            this.viewer.SetUpVector (Direction.Z, true);
-        });
+        // AddButton (this.toolbar, 'up_y', 'Set Y axis as up vector', ['only_on_model'], () => {
+        //     this.viewer.SetUpVector (Direction.Y, true);
+        // });
+        // AddButton (this.toolbar, 'up_z', 'Set Z axis as up vector', ['only_on_model'], () => {
+        //     this.viewer.SetUpVector (Direction.Z, true);
+        // });
         AddButton (this.toolbar, 'flip', 'Flip up vector', ['only_on_model'], () => {
             this.viewer.FlipUpVector ();
         });
