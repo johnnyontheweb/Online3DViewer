@@ -143,7 +143,7 @@ export class EmbeddedViewer
                 if (this.parameters.camera) {
                     this.viewer.SetCamera (this.parameters.camera);
                 } else {
-                    this.viewer.SetUpVector (Direction.Z, false);
+                    this.viewer.SetUpVector (Direction.Y, false);
                     this.viewer.FitSphereToWindow (boundingSphere, false);
                 }
 

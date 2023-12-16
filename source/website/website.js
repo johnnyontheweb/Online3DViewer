@@ -299,7 +299,7 @@ export class Website
         this.model = importResult.model;
         this.parameters.fileNameDiv.innerHTML = importResult.mainFile;
         this.viewer.SetMainObject (threeObject);
-        this.viewer.SetUpVector (Direction.Z, false);
+        this.viewer.SetUpVector (Direction.Y, false);
         this.viewer.showEdges = true;
         this.navigator.FillTree (importResult);
         this.sidebar.UpdateControlsVisibility ();
