@@ -1,6 +1,6 @@
 import { Coord2D } from '../geometry/coord2d.js';
 import { Coord3D } from '../geometry/coord3d.js';
-import { ColorFromFloatComponents } from '../model/color.js';
+import { RGBColorFromFloatComponents } from '../model/color.js';
 import { MaterialType } from '../model/material.js';
 import { Mesh } from '../model/mesh.js';
 import { Triangle } from '../model/triangle.js';
@@ -21,6 +21,7 @@ export function HasHighpDriverIssue ()
     };
 
     let renderer = new THREE.WebGLRenderer (parameters);
+    renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
     renderer.setClearColor ('#ffffff', 1);
     renderer.setSize (10, 10);
 
@@ -89,9 +90,33 @@ export function GetShadingType (model)
     }
 }
 
+export class ThreeColorConverter
+{
+    Convert (color)
+    {
+        return null;
+    }
+}
+
+export class ThreeLinearToSRGBColorConverter extends ThreeColorConverter
+{
+    Convert (color)
+    {
+        return new THREE.Color ().copyLinearToSRGB (color);
+    }
+}
+
+export class ThreeSRGBToLinearColorConverter extends ThreeColorConverter
+{
+    Convert (color)
+    {
+        return new THREE.Color ().copySRGBToLinear (color);
+    }
+}
+
 export function ConvertThreeColorToColor (threeColor)
 {
-    return ColorFromFloatComponents (threeColor.r, threeColor.g, threeColor.b);
+    return RGBColorFromFloatComponents (threeColor.r, threeColor.g, threeColor.b);
 }
 
 export function ConvertColorToThreeColor (color)
@@ -103,7 +128,7 @@ export function ConvertColorToThreeColor (color)
     );
 }
 
-export function ConvertThreeGeometryToMesh (threeGeometry, materialIndex)
+export function ConvertThreeGeometryToMesh (threeGeometry, materialIndex, colorConverter)
 {
     let mesh = new Mesh ();
 
@@ -122,6 +147,9 @@ export function ConvertThreeGeometryToMesh (threeGeometry, materialIndex)
         let colorItemSize = threeGeometry.attributes.color.itemSize || 3;
         for (let i = 0; i < colors.length; i += colorItemSize) {
             let threeColor = new THREE.Color (colors[i], colors[i + 1], colors[i + 2]);
+            if (colorConverter !== null) {
+                threeColor = colorConverter.Convert (threeColor);
+            }
             mesh.AddVertexColor (ConvertThreeColorToColor (threeColor));
         }
     }
@@ -180,4 +208,25 @@ export function ConvertThreeGeometryToMesh (threeGeometry, materialIndex)
     }
 
     return mesh;
+}
+
+export function DisposeThreeObjects (mainObject)
+{
+    if (mainObject === null) {
+        return;
+    }
+
+    mainObject.traverse ((obj) => {
+        if (obj.isMesh || obj.isLineSegments) {
+            if (Array.isArray (obj.material)) {
+                for (let material of obj.material) {
+                    material.dispose ();
+                }
+            } else {
+                obj.material.dispose ();
+            }
+            obj.userData = null;
+            obj.geometry.dispose ();
+        }
+    });
 }

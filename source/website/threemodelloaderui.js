@@ -28,6 +28,10 @@ export class ThreeModelLoaderUI
                 progressDialog.Init ('Loading Model');
                 progressDialog.Open ();
             },
+            onFileListProgress : (current, total) => {
+            },
+            onFileLoadProgress : (current, total) => {
+            },
             onSelectMainFile : (fileNames, selectFile) => {
                 progressDialog.Close ();
                 this.modalDialog = this.ShowFileSelectorDialog (fileNames, (index) => {

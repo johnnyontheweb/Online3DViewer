@@ -1,27 +1,27 @@
 import { RunTaskAsync } from '../core/taskrunner.js';
 import { FileSource, GetFileName } from '../io/fileutils.js';
-import { Color } from '../model/color.js';
+import { RGBColor } from '../model/color.js';
 import { ImporterFile, ImporterFileList } from './importerfiles.js';
 import { Importer3dm } from './importer3dm.js';
 import { Importer3ds } from './importer3ds.js';
 import { ImporterGltf } from './importergltf.js';
 import { ImporterIfc } from './importerifc.js';
-import { ImporterO3dv } from './importero3dv.js';
 import { ImporterObj } from './importerobj.js';
 import { ImporterOff } from './importeroff.js';
 import { ImporterPly } from './importerply.js';
-import { ImporterStp } from './importerstp.js';
+import { ImporterOcct } from './importerocct.js';
 import { ImporterStl } from './importerstl.js';
 import { ImporterBim } from './importerbim.js';
-import { ImporterThree3mf, ImporterThreeDae, ImporterThreeFbx, ImporterThreeWrl } from './importerthree.js';
+import { ImporterThreeAmf, ImporterThree3mf, ImporterThreeDae, ImporterThreeFbx, ImporterThreeWrl } from './importerthree.js';
 
 import * as fflate from 'fflate';
+import { ImporterFcstd } from './importerfcstd.js';
 
 export class ImportSettings
 {
     constructor ()
     {
-        this.defaultColor = new Color (200, 200, 200);
+        this.defaultColor = new RGBColor (200, 200, 200);
     }
 }
 
@@ -86,15 +86,16 @@ export class Importer
             new ImporterPly (),
             new Importer3ds (),
             new ImporterGltf (),
-            new ImporterO3dv (),
             new ImporterBim (),
             new Importer3dm (),
             new ImporterIfc (),
-            new ImporterStp (),
+            new ImporterOcct (),
+            new ImporterFcstd (),
             new ImporterThreeFbx (),
             new ImporterThreeDae (),
             new ImporterThreeWrl (),
-            new ImporterThree3mf ()
+            new ImporterThree3mf (),
+            new ImporterThreeAmf ()
         ];
         this.fileList = new ImporterFileList ();
         this.model = null;
@@ -109,15 +110,22 @@ export class Importer
 
     ImportFiles (inputFiles, settings, callbacks)
     {
-        this.LoadFiles (inputFiles, () => {
-            callbacks.onFilesLoaded ();
-            RunTaskAsync (() => {
-                this.ImportLoadedFiles (settings, callbacks);
-            });
+        callbacks.onLoadStart ();
+        this.LoadFiles (inputFiles, {
+            onReady : () => {
+                callbacks.onImportStart ();
+                RunTaskAsync (() => {
+                    this.DecompressArchives (this.fileList, () => {
+                        this.ImportLoadedFiles (settings, callbacks);
+                    });
+                });
+            },
+            onFileListProgress : callbacks.onFileListProgress,
+            onFileLoadProgress : callbacks.onFileLoadProgress
         });
     }
 
-    LoadFiles (inputFiles, onReady)
+    LoadFiles (inputFiles, callbacks)
     {
         let newFileList = new ImporterFileList ();
         newFileList.FillFromInputFiles (inputFiles);
@@ -143,10 +151,10 @@ export class Importer
         if (reset) {
             this.fileList = newFileList;
         }
-        this.fileList.GetContent (() => {
-            this.DecompressArchives (this.fileList, () => {
-                onReady ();
-            });
+        this.fileList.GetContent ({
+            onReady : callbacks.onReady,
+            onFileListProgress : callbacks.onFileListProgress,
+            onFileLoadProgress : callbacks.onFileLoadProgress
         });
     }
 

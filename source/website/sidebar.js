@@ -1,15 +1,13 @@
-import { ShowDomElement, SetDomElementWidth, SetDomElementHeight, GetDomElementOuterWidth, SetDomElementOuterHeight } from '../engine/viewer/domutils.js';
+import { GetDomElementOuterWidth, SetDomElementOuterHeight, SetDomElementOuterWidth } from '../engine/viewer/domutils.js';
 import { PanelSet } from './panelset.js';
 import { SidebarDetailsPanel } from './sidebardetailspanel.js';
 import { SidebarSettingsPanel } from './sidebarsettingspanel.js';
-import { InstallVerticalSplitter } from './utils.js';
 
 export class Sidebar
 {
-    constructor (mainDiv, splitterDiv, settings)
+    constructor (mainDiv, settings)
     {
         this.mainDiv = mainDiv;
-        this.splitterDiv = splitterDiv;
         this.panelSet = new PanelSet (mainDiv);
 
         this.detailsPanel = new SidebarDetailsPanel (this.panelSet.GetContentDiv ());
@@ -20,7 +18,7 @@ export class Sidebar
         this.panelSet.ShowPanel (this.detailsPanel);
     }
 
-    IsPanelsle ()
+    IsPanelsVisible ()
     {
         return this.panelSet.IsPanelsVisible ();
     }
@@ -35,9 +33,8 @@ export class Sidebar
         this.callbacks = callbacks;
 
         this.panelSet.Init ({
-            onResize : () => {
-                ShowDomElement (this.splitterDiv, this.panelSet.IsPanelsVisible ());
-                this.callbacks.onResize ();
+            onResizeRequested : () => {
+                this.callbacks.onResizeRequested ();
             },
             onShowHidePanels : (show) => {
                 this.callbacks.onShowHidePanels (show);
@@ -45,54 +42,54 @@ export class Sidebar
         });
 
         this.settingsPanel.Init ({
-            onEnvironmentMapChange : () => {
-                this.callbacks.onEnvironmentMapChange ();
+            getShadingType : () => {
+                return this.callbacks.getShadingType ();
             },
-            onBackgroundColorChange : () => {
-                this.callbacks.onBackgroundColorChange ();
+            getProjectionMode : () => {
+                return this.callbacks.getProjectionMode ();
             },
-            onDefaultColorChange : () => {
-                this.callbacks.onDefaultColorChange ();
+            hasDefaultMaterial : () => {
+                return this.callbacks.hasDefaultMaterial ();
             },
-            onEdgeDisplayChange : () => {
-                this.callbacks.onEdgeDisplayChange ();
+            onEnvironmentMapChanged : () => {
+                this.callbacks.onEnvironmentMapChanged ();
             },
-            onThemeChange : () => {
-                this.callbacks.onThemeChange ();
+            onBackgroundColorChanged : () => {
+                this.callbacks.onBackgroundColorChanged ();
+            },
+            onDefaultColorChanged : () => {
+                this.callbacks.onDefaultColorChanged ();
+            },
+            onEdgeDisplayChanged : () => {
+                this.callbacks.onEdgeDisplayChanged ();
             }
-        });
-
-        InstallVerticalSplitter (this.splitterDiv, this.mainDiv, true, () => {
-            this.callbacks.onResize ();
         });
     }
 
-    UpdateSettings (isPhysicallyBased, hasDefaultMaterial)
+    UpdateControlsStatus ()
     {
-        this.settingsPanel.UpdateSettings (isPhysicallyBased, hasDefaultMaterial);
+        this.settingsPanel.UpdateControlsStatus ();
+    }
+
+    UpdateControlsVisibility ()
+    {
+        this.settingsPanel.UpdateControlsVisibility ();
     }
 
     Resize (height)
     {
         SetDomElementOuterHeight (this.mainDiv, height);
-        SetDomElementHeight (this.splitterDiv, height);
         this.panelSet.Resize ();
     }
 
     GetWidth ()
     {
-        let sidebarWidth = GetDomElementOuterWidth (this.mainDiv);
-        let splitterWidth = 0;
-        if (this.panelSet.IsPanelsVisible ()) {
-             splitterWidth = this.splitterDiv.offsetWidth;
-        }
-        return sidebarWidth + splitterWidth;
+        return GetDomElementOuterWidth (this.mainDiv);
     }
 
-    DecreaseWidth (diff)
+    SetWidth (width)
     {
-        let oldWidth = this.mainDiv.offsetWidth;
-        SetDomElementWidth (this.mainDiv, oldWidth - diff);
+        SetDomElementOuterWidth (this.mainDiv, width);
     }
 
     Clear ()
@@ -100,9 +97,9 @@ export class Sidebar
         this.panelSet.Clear ();
     }
 
-    AddObject3DProperties (object3D)
+    AddObject3DProperties (model, object3D)
     {
-        this.detailsPanel.AddObject3DProperties (object3D);
+        this.detailsPanel.AddObject3DProperties (model, object3D);
     }
 
     AddMaterialProperties (material)

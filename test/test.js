@@ -1,4 +1,4 @@
-import globals from './utils/globals.js';
+import { SetGlobals } from './utils/globals.js';
 import * as OV from '../source/engine/main.js';
 import * as path from 'path';
 
@@ -10,6 +10,7 @@ import geometry_test from './tests/geometry_test.js';
 import meshbuffer_test from './tests/meshbuffer_test.js';
 import mesh_test from './tests/mesh_test.js';
 import modelutils_test from './tests/modelutils_test.js';
+import topology_test from './tests/topology_test.js';
 import node_test from './tests/node_test.js';
 import model_test from './tests/model_test.js';
 import quantities_test from './tests/quantities_test.js';
@@ -17,7 +18,6 @@ import generator_test from './tests/generator_test.js';
 import importerutils_test from './tests/importerutils_test.js';
 import importer3ds_test from './tests/importer3ds_test.js';
 import importergltf_test from './tests/importergltf_test.js';
-import importero3dv_test from './tests/importero3dv_test.js';
 import importerobj_test from './tests/importerobj_test.js';
 import importeroff_test from './tests/importeroff_test.js';
 import importerply_test from './tests/importerply_test.js';
@@ -30,7 +30,7 @@ import property_test from './tests/property_test.js';
 import parameterlist_test from './tests/parameterlist_test.js';
 
 process.chdir (path.resolve ());
-globals ();
+SetGlobals ();
 OV.SetExternalLibLocation ('libs');
 
 core_test ();
@@ -41,6 +41,7 @@ geometry_test ();
 meshbuffer_test ();
 mesh_test ();
 modelutils_test ();
+topology_test ();
 node_test ();
 model_test ();
 quantities_test ();
@@ -48,7 +49,6 @@ generator_test ();
 importerutils_test ();
 importer3ds_test ();
 importergltf_test ();
-importero3dv_test ();
 importerobj_test ();
 importeroff_test ();
 importerply_test ();

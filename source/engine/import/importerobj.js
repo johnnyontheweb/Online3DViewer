@@ -2,7 +2,7 @@ import { Coord2D } from '../geometry/coord2d.js';
 import { Coord3D } from '../geometry/coord3d.js';
 import { Direction } from '../geometry/geometry.js';
 import { ArrayBufferToUtf8String } from '../io/bufferutils.js';
-import { Color, ColorFromFloatComponents } from '../model/color.js';
+import { RGBColor, RGBColorFromFloatComponents } from '../model/color.js';
 import { PhongMaterial, TextureMap } from '../model/material.js';
 import { Mesh } from '../model/mesh.js';
 import { Triangle } from '../model/triangle.js';
@@ -30,7 +30,7 @@ class ObjMeshConverter
     AddVertexColor (globalIndex, globalVertexColors)
     {
         return this.GetLocalIndex (globalIndex, globalVertexColors, this.globalToMeshVertexColors, (val) => {
-            return this.mesh.AddVertexColor (new Color (val.r, val.g, val.b));
+            return this.mesh.AddVertexColor (new RGBColor (val.r, val.g, val.b));
         });
     }
 
@@ -71,7 +71,7 @@ class ObjMeshConverter
 
 function CreateColor (r, g, b)
 {
-    return ColorFromFloatComponents (
+    return RGBColorFromFloatComponents (
         parseFloat (r),
         parseFloat (g),
         parseFloat (b)
@@ -226,13 +226,53 @@ export class ImporterObj extends ImporterBase
 
     ProcessMaterialParameter (keyword, parameters, line)
     {
-        function CreateTexture (keyword, line, callbacks)
+        function ExtractTextureParameters (parameters)
+        {
+            let textureParameters = new Map ();
+            let lastParameter = null;
+            for (let i = 0; i < parameters.length - 1; i++) {
+                let parameter = parameters[i];
+                if (parameter.startsWith ('-')) {
+                    lastParameter = parameter;
+                    textureParameters.set (lastParameter, []);
+                    continue;
+                }
+                if (lastParameter !== null) {
+                    textureParameters.get (lastParameter).push (parameter);
+                }
+            }
+            return textureParameters;
+        }
+
+        function CreateTexture (parameters, callbacks)
         {
             let texture = new TextureMap ();
-            let textureName = NameFromLine (line, keyword.length, '#');
+            let textureName = parameters[parameters.length - 1];
             let textureBuffer = callbacks.getFileBuffer (textureName);
             texture.name = textureName;
             texture.buffer = textureBuffer;
+
+            let textureParameters = ExtractTextureParameters (parameters);
+            if (textureParameters.has ('-o')) {
+                let offsetParameters = textureParameters.get ('-o');
+                if (offsetParameters.length > 0) {
+                    texture.offset.x = parseFloat (offsetParameters[0]);
+                }
+                if (offsetParameters.length > 1) {
+                    texture.offset.y = parseFloat (offsetParameters[1]);
+                }
+            }
+
+            if (textureParameters.has ('-s')) {
+                let scaleParameters = textureParameters.get ('-s');
+                if (scaleParameters.length > 0) {
+                    texture.scale.x = parseFloat (scaleParameters[0]);
+                }
+                if (scaleParameters.length > 1) {
+                    texture.scale.y = parseFloat (scaleParameters[1]);
+                }
+            }
+
             return texture;
         }
 
@@ -277,20 +317,20 @@ export class ImporterObj extends ImporterBase
             if (this.currentMaterial === null || parameters.length === 0) {
                 return true;
             }
-            this.currentMaterial.diffuseMap = CreateTexture (keyword, line, this.callbacks);
+            this.currentMaterial.diffuseMap = CreateTexture (parameters, this.callbacks);
             UpdateMaterialTransparency (this.currentMaterial);
             return true;
         } else if (keyword === 'map_ks') {
             if (this.currentMaterial === null || parameters.length === 0) {
                 return true;
             }
-            this.currentMaterial.specularMap = CreateTexture (keyword, line, this.callbacks);
+            this.currentMaterial.specularMap = CreateTexture (parameters, this.callbacks);
             return true;
         } else if (keyword === 'map_bump' || keyword === 'bump') {
             if (this.currentMaterial === null || parameters.length === 0) {
                 return true;
             }
-            this.currentMaterial.bumpMap = CreateTexture (keyword, line, this.callbacks);
+            this.currentMaterial.bumpMap = CreateTexture (parameters, this.callbacks);
             return true;
         } else if (keyword === 'ka') {
             if (this.currentMaterial === null || parameters.length < 3) {

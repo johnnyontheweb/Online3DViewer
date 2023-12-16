@@ -1,9 +1,8 @@
-import { ShowDomElement, SetDomElementHeight, GetDomElementOuterWidth, SetDomElementOuterHeight } from '../engine/viewer/domutils.js';
+import { GetDomElementOuterWidth, SetDomElementOuterHeight, SetDomElementOuterWidth } from '../engine/viewer/domutils.js';
 import { NavigatorFilesPanel } from './navigatorfilespanel.js';
 import { NavigatorMaterialsPanel } from './navigatormaterialspanel.js';
 import { NavigatorMeshesPanel } from './navigatormeshespanel.js';
 import { PanelSet } from './panelset.js';
-import { InstallVerticalSplitter } from './utils.js';
 
 export const SelectionType =
 {
@@ -40,10 +39,9 @@ export class Selection
 
 export class Navigator
 {
-    constructor (mainDiv, splitterDiv)
+    constructor (mainDiv)
     {
         this.mainDiv = mainDiv;
-        this.splitterDiv = splitterDiv;
 
         this.panelSet = new PanelSet (mainDiv);
         this.callbacks = null;
@@ -60,6 +58,11 @@ export class Navigator
         this.panelSet.ShowPanel (this.meshesPanel);
     }
 
+    IsPanelsVisible ()
+    {
+        return this.panelSet.IsPanelsVisible ();
+    }
+
     ShowPanels (show)
     {
         this.panelSet.ShowPanels (show);
@@ -70,13 +73,12 @@ export class Navigator
         this.callbacks = callbacks;
 
         this.panelSet.Init ({
-            onResize : () => {
-                ShowDomElement (this.splitterDiv, this.panelSet.IsPanelsVisible ());
-                this.callbacks.onResize ();
+            onResizeRequested : () => {
+                this.callbacks.onResizeRequested ();
             },
             onShowHidePanels : (show) => {
                 this.callbacks.onShowHidePanels (show);
-            },
+            }
         });
 
         this.filesPanel.Init ({
@@ -91,7 +93,7 @@ export class Navigator
             },
             onMeshTemporarySelected : (meshInstanceId) => {
                 this.tempSelectedMeshId = meshInstanceId;
-                this.callbacks.updateMeshesSelection ();
+                this.callbacks.onMeshSelectionChanged ();
             },
             onMeshSelected : (meshInstanceId) => {
                 this.SetSelection (new Selection (SelectionType.Mesh, meshInstanceId));
@@ -121,26 +123,21 @@ export class Navigator
                 this.SetSelection (null);
             }
         });
-
-        InstallVerticalSplitter (this.splitterDiv, this.mainDiv, false, () => {
-            this.callbacks.onResize ();
-        });
     }
 
     GetWidth ()
     {
-        let navigatorWidth = GetDomElementOuterWidth (this.mainDiv);
-        let splitterWidth = 0;
-        if (this.panelSet.IsPanelsVisible ()) {
-            splitterWidth = this.splitterDiv.offsetWidth;
-        }
-        return navigatorWidth + splitterWidth;
+        return GetDomElementOuterWidth (this.mainDiv);
+    }
+
+    SetWidth (width)
+    {
+        SetDomElementOuterWidth (this.mainDiv, width);
     }
 
     Resize (height)
     {
         SetDomElementOuterHeight (this.mainDiv, height);
-        SetDomElementHeight (this.splitterDiv, height);
         this.panelSet.Resize ();
     }
 
@@ -175,19 +172,19 @@ export class Navigator
     ShowAllMeshes (show)
     {
         this.meshesPanel.ShowAllMeshes (show);
-        this.callbacks.updateMeshesVisibility ();
+        this.callbacks.onMeshVisibilityChanged ();
     }
 
     ToggleNodeVisibility (nodeId)
     {
         this.meshesPanel.ToggleNodeVisibility (nodeId);
-        this.callbacks.updateMeshesVisibility ();
+        this.callbacks.onMeshVisibilityChanged ();
     }
 
     ToggleMeshVisibility (meshInstanceId)
     {
         this.meshesPanel.ToggleMeshVisibility (meshInstanceId);
-        this.callbacks.updateMeshesVisibility ();
+        this.callbacks.onMeshVisibilityChanged ();
     }
 
     IsMeshIsolated (meshInstanceId)
@@ -198,7 +195,7 @@ export class Navigator
     IsolateMesh (meshInstanceId)
     {
         this.meshesPanel.IsolateMesh (meshInstanceId);
-        this.callbacks.updateMeshesVisibility ();
+        this.callbacks.onMeshVisibilityChanged ();
     }
 
     GetSelectedMeshId ()
@@ -252,13 +249,13 @@ export class Navigator
             }
         }
 
-        this.callbacks.updateMeshesSelection ();
+        this.callbacks.onMeshSelectionChanged ();
     }
 
     OnSelectionChanged ()
     {
         if (this.selection === null) {
-            this.callbacks.onModelSelected ();
+            this.callbacks.onSelectionCleared ();
         } else {
             if (this.selection.type === SelectionType.Material) {
                 this.callbacks.onMaterialSelected (this.selection.materialIndex);

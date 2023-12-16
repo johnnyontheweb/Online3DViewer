@@ -15,13 +15,13 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-node@v2
         with:
-          node-version: '16.x'
+          node-version: '18.x'
           registry-url: 'https://registry.npmjs.org'
       - run: npm install
       - run: npm run create_dist
       - uses: ncipollo/release-action@v1
         with:
-          artifacts: "build/final/package/*"
+          artifacts: "build/package/engine/*"
           bodyFile: ".github/workflows/release_template.md"
           draft: true
           token: ${{ secrets.GITHUB_TOKEN }}

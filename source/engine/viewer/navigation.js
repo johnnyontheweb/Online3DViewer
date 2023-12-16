@@ -2,7 +2,7 @@ import { Coord2D, CoordDistance2D, SubCoord2D } from '../geometry/coord2d.js';
 import { CoordDistance3D, CrossVector3D, SubCoord3D, VectorAngle3D } from '../geometry/coord3d.js';
 import { DegRad, IsGreater, IsLower, IsZero } from '../geometry/geometry.js';
 import { ParabolicTweenFunction, TweenCoord3D } from '../geometry/tween.js';
-import { CameraIsEqual3D } from './camera.js';
+import { CameraIsEqual3D, NavigationMode } from './camera.js';
 import { GetDomElementClientCoordinates } from './domutils.js';
 
 export class MouseInteraction
@@ -241,7 +241,7 @@ export class Navigation
 		this.canvas = canvas;
 		this.camera = camera;
 		this.callbacks = callbacks;
-		this.fixUpVector = true;
+		this.navigationMode = NavigationMode.FixedUpVector;
 
 		this.mouse = new MouseInteraction ();
 		this.touch = new TouchInteraction ();
@@ -282,14 +282,14 @@ export class Navigation
 		this.onContext = onContext;
 	}
 
-	IsFixUpVector ()
+	GetNavigationMode ()
 	{
-		return this.fixUpVector;
+		return this.navigationMode;
 	}
 
-	SetFixUpVector (fixUpVector)
+	SetNavigationMode (navigationMode)
 	{
-		this.fixUpVector = fixUpVector;
+		this.navigationMode = navigationMode;
 	}
 
 	GetCamera ()
@@ -339,7 +339,7 @@ export class Navigation
 		this.Update ();
 	}
 
-	GetFitToSphereCamera (center, radius, fov)
+	GetFitToSphereCamera (center, radius)
 	{
 		if (IsZero (radius)) {
 			return null;
@@ -352,7 +352,7 @@ export class Navigation
 		fitCamera.center = center.Clone ();
 
 		let centerEyeDirection = SubCoord3D (fitCamera.eye, fitCamera.center).Normalize ();
-		let fieldOfView = fov / 2.0;
+		let fieldOfView = this.camera.fov / 2.0;
 		if (this.canvas.width < this.canvas.height) {
 			fieldOfView = fieldOfView * this.canvas.width / this.canvas.height;
 		}
@@ -522,14 +522,14 @@ export class Navigation
 		let viewDirection = SubCoord3D (this.camera.center, this.camera.eye).Normalize ();
 		let horizontalDirection = CrossVector3D (viewDirection, this.camera.up).Normalize ();
 
-		if (this.fixUpVector) {
+		if (this.navigationMode === NavigationMode.FixedUpVector) {
 			let originalAngle = VectorAngle3D (viewDirection, this.camera.up);
 			let newAngle = originalAngle + radAngleY;
 			if (IsGreater (newAngle, 0.0) && IsLower (newAngle, Math.PI)) {
 				this.camera.eye.Rotate (horizontalDirection, -radAngleY, this.camera.center);
 			}
 			this.camera.eye.Rotate (this.camera.up, -radAngleX, this.camera.center);
-		} else {
+		} else if (this.navigationMode === NavigationMode.FreeOrbit) {
 			let verticalDirection = CrossVector3D (horizontalDirection, viewDirection).Normalize ();
 			this.camera.eye.Rotate (horizontalDirection, -radAngleY, this.camera.center);
 			this.camera.eye.Rotate (verticalDirection, -radAngleX, this.camera.center);

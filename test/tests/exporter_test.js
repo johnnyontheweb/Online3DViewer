@@ -1,5 +1,6 @@
 import * as assert from 'assert';
 import * as OV from '../../source/engine/main.js';
+import { CreateHierarchicalTestModelForExport } from '../utils/testutils.js';
 
 export default function suite ()
 {
@@ -10,9 +11,9 @@ function CreateTestModel ()
 
     let material1 = new OV.PhongMaterial ();
     material1.name = 'TestMaterial1';
-    material1.ambient = new OV.Color (0, 0, 0);
-    material1.color = new OV.Color (255, 0, 0);
-    material1.specular = new OV.Color (51, 51, 51);
+    material1.ambient = new OV.RGBColor (0, 0, 0);
+    material1.color = new OV.RGBColor (255, 0, 0);
+    material1.specular = new OV.RGBColor (51, 51, 51);
     material1.diffuseMap = new OV.TextureMap ();
     material1.diffuseMap.name = 'textures/texture1.png';
     material1.diffuseMap.buffer = new ArrayBuffer (1);
@@ -26,9 +27,9 @@ function CreateTestModel ()
 
     let material2 = new OV.PhongMaterial ();
     material2.name = 'TestMaterial2';
-    material2.ambient = new OV.Color (0, 0, 0);
-    material2.color = new OV.Color (0, 255, 0);
-    material2.specular = new OV.Color (51, 51, 51);
+    material2.ambient = new OV.RGBColor (0, 0, 0);
+    material2.color = new OV.RGBColor (0, 255, 0);
+    material2.specular = new OV.RGBColor (51, 51, 51);
     model.AddMaterial (material2);
 
     let mesh1 = new OV.Mesh ();
@@ -63,10 +64,9 @@ function CreateTestModel ()
     return model;
 }
 
-function Export (model, format, extension, onReady)
+function Export (model, settings, format, extension, onReady)
 {
     let exporter = new OV.Exporter ();
-    let settings = new OV.ExporterSettings ();
     exporter.Export (model, settings, format, extension, {
         onSuccess : function (files) {
             onReady (files);
@@ -88,7 +88,8 @@ describe ('Exporter', function () {
 
     it ('Obj Export', function (done) {
         let model = CreateTestModel ();
-        Export (model, OV.FileFormat.Text, 'obj', function (result) {
+        let settings = new OV.ExporterSettings ();
+        Export (model, settings, OV.FileFormat.Text, 'obj', function (result) {
             assert.strictEqual (result.length, 5);
 
             let mtlFile = result[0];
@@ -160,7 +161,8 @@ describe ('Exporter', function () {
 
     it ('Stl Export', function (done) {
         let model = CreateTestModel ();
-        Export (model, OV.FileFormat.Text, 'stl', function (result) {
+        let settings = new OV.ExporterSettings ();
+        Export (model, settings, OV.FileFormat.Text, 'stl', function (result) {
             assert.strictEqual (result.length, 1);
 
             let stlFile = result[0];
@@ -206,7 +208,8 @@ describe ('Exporter', function () {
 
     it ('Stl Binary Export', function (done) {
         let model = CreateTestModel ();
-        Export (model, OV.FileFormat.Binary, 'stl', function (result) {
+        let settings = new OV.ExporterSettings ();
+        Export (model, settings, OV.FileFormat.Binary, 'stl', function (result) {
             assert.strictEqual (result.length, 1);
 
             let stlFile = result[0];
@@ -217,7 +220,7 @@ describe ('Exporter', function () {
             let importer = new OV.ImporterStl ();
             importer.Import (stlFile.GetName (), 'stl', contentBuffer, {
                 getDefaultMaterialColor () {
-                    return new OV.Color (0, 0, 0);
+                    return new OV.RGBColor (0, 0, 0);
                 },
                 onSuccess () {
                     let importedModel = importer.GetModel ();
@@ -233,7 +236,8 @@ describe ('Exporter', function () {
 
     it ('Off Export', function (done) {
         let model = CreateTestModel ();
-        Export (model, OV.FileFormat.Text, 'off', function (result) {
+        let settings = new OV.ExporterSettings ();
+        Export (model, settings, OV.FileFormat.Text, 'off', function (result) {
             assert.strictEqual (result.length, 1);
 
             let offFile = result[0];
@@ -263,7 +267,8 @@ describe ('Exporter', function () {
 
     it ('Ply Export', function (done) {
         let model = CreateTestModel ();
-        Export (model, OV.FileFormat.Text, 'ply', function (result) {
+        let settings = new OV.ExporterSettings ();
+        Export (model, settings, OV.FileFormat.Text, 'ply', function (result) {
             assert.strictEqual (result.length, 1);
 
             let plyFile = result[0];
@@ -300,7 +305,8 @@ describe ('Exporter', function () {
 
     it ('Ply Binary Export', function (done) {
         let model = CreateTestModel ();
-        Export (model, OV.FileFormat.Binary, 'ply', function (result) {
+        let settings = new OV.ExporterSettings ();
+        Export (model, settings, OV.FileFormat.Binary, 'ply', function (result) {
             assert.strictEqual (result.length, 1);
 
             let plyFile = result[0];
@@ -311,7 +317,7 @@ describe ('Exporter', function () {
             let importer = new OV.ImporterPly ();
             importer.Import (plyFile.GetName (), 'ply', contentBuffer, {
                 getDefaultMaterialColor () {
-                    return new OV.Color (0, 0, 0);
+                    return new OV.RGBColor (0, 0, 0);
                 },
                 onSuccess () {
                     let importedModel = importer.GetModel ();
@@ -325,7 +331,8 @@ describe ('Exporter', function () {
 
     it ('Gltf Ascii Export', function (done) {
         let model = CreateTestModel ();
-        Export (model, OV.FileFormat.Text, 'gltf', function (result) {
+        let settings = new OV.ExporterSettings ();
+        Export (model, settings, OV.FileFormat.Text, 'gltf', function (result) {
             assert.strictEqual (result.length, 3);
 
             let gltfFile = result[0];
@@ -341,7 +348,7 @@ describe ('Exporter', function () {
             let importer = new OV.ImporterGltf ();
             importer.Import (gltfFile.GetName (), 'gltf', contentBuffer, {
                 getDefaultMaterialColor () {
-                    return new OV.Color (0, 0, 0);
+                    return new OV.RGBColor (0, 0, 0);
                 },
                 getFileBuffer (filePath) {
                     if (filePath == 'model.bin') {
@@ -366,7 +373,8 @@ describe ('Exporter', function () {
 
     it ('Gltf Binary Export', function (done) {
         let model = CreateTestModel ();
-        Export (model, OV.FileFormat.Binary, 'glb', function (result) {
+        let settings = new OV.ExporterSettings ();
+        Export (model, settings, OV.FileFormat.Binary, 'glb', function (result) {
             assert.strictEqual (result.length, 1);
 
             let glbFile = result[0];
@@ -376,7 +384,7 @@ describe ('Exporter', function () {
             let importer = new OV.ImporterGltf ();
             importer.Import (glbFile.GetName (), 'glb', contentBuffer, {
                 getDefaultMaterialColor () {
-                    return new OV.Color (0, 0, 0);
+                    return new OV.RGBColor (0, 0, 0);
                 },
                 getFileBuffer (filePath) {
                     return null;
@@ -390,6 +398,142 @@ describe ('Exporter', function () {
                     assert.strictEqual (importedModel.GetMesh (1).GetName (), 'TestMesh2');
                     assert.strictEqual (importedModel.VertexCount (), 12);
                     assert.strictEqual (importedModel.TriangleCount (), 4);
+                    done ();
+                }
+            });
+        });
+    });
+
+    it ('Gltf Hierarchical Export No Filter', function (done) {
+        let model = CreateHierarchicalTestModelForExport ();
+        let settings = new OV.ExporterSettings ();
+        Export (model, settings, OV.FileFormat.Binary, 'glb', function (result) {
+            assert.strictEqual (result.length, 1);
+
+            let glbFile = result[0];
+            assert.strictEqual (glbFile.GetName (), 'model.glb');
+
+            let contentBuffer = glbFile.GetBufferContent ();
+            let importer = new OV.ImporterGltf ();
+            importer.Import (glbFile.GetName (), 'glb', contentBuffer, {
+                getDefaultMaterialColor () {
+                    return new OV.RGBColor (0, 0, 0);
+                },
+                getFileBuffer (filePath) {
+                    return null;
+                },
+                onSuccess () {
+                    let importedModel = importer.GetModel ();
+                    assert.ok (OV.CheckModel (importedModel));
+                    assert.strictEqual (importedModel.NodeCount (), 5);
+                    assert.strictEqual (importedModel.MaterialCount (), 3);
+                    assert.strictEqual (importedModel.MeshCount (), 3);
+                    assert.strictEqual (importedModel.MeshInstanceCount (), 4);
+                    done ();
+                }
+            });
+        });
+    });
+
+    it ('Gltf Hierarchical Export Filter 1', function (done) {
+        let model = CreateHierarchicalTestModelForExport ();
+        let settings = new OV.ExporterSettings ({
+            isMeshVisible : (meshInstanceId) => {
+                return !meshInstanceId.IsEqual (new OV.MeshInstanceId (3, 1));
+            }
+        });
+        Export (model, settings, OV.FileFormat.Binary, 'glb', function (result) {
+            assert.strictEqual (result.length, 1);
+
+            let glbFile = result[0];
+            assert.strictEqual (glbFile.GetName (), 'model.glb');
+
+            let contentBuffer = glbFile.GetBufferContent ();
+            let importer = new OV.ImporterGltf ();
+            importer.Import (glbFile.GetName (), 'glb', contentBuffer, {
+                getDefaultMaterialColor () {
+                    return new OV.RGBColor (0, 0, 0);
+                },
+                getFileBuffer (filePath) {
+                    return null;
+                },
+                onSuccess () {
+                    let importedModel = importer.GetModel ();
+                    assert.ok (OV.CheckModel (importedModel));
+                    assert.strictEqual (importedModel.NodeCount (), 4);
+                    assert.strictEqual (importedModel.MaterialCount (), 3);
+                    assert.strictEqual (importedModel.MeshCount (), 3);
+                    assert.strictEqual (importedModel.MeshInstanceCount (), 3);
+                    done ();
+                }
+            });
+        });
+    });
+
+    it ('Gltf Hierarchical Export Filter 1', function (done) {
+        let model = CreateHierarchicalTestModelForExport ();
+        let settings = new OV.ExporterSettings ({
+            isMeshVisible : (meshInstanceId) => {
+                return !meshInstanceId.IsEqual (new OV.MeshInstanceId (2, 1)) && !meshInstanceId.IsEqual (new OV.MeshInstanceId (3, 1));
+            }
+        });
+        Export (model, settings, OV.FileFormat.Binary, 'glb', function (result) {
+            assert.strictEqual (result.length, 1);
+
+            let glbFile = result[0];
+            assert.strictEqual (glbFile.GetName (), 'model.glb');
+
+            let contentBuffer = glbFile.GetBufferContent ();
+            let importer = new OV.ImporterGltf ();
+            importer.Import (glbFile.GetName (), 'glb', contentBuffer, {
+                getDefaultMaterialColor () {
+                    return new OV.RGBColor (0, 0, 0);
+                },
+                getFileBuffer (filePath) {
+                    return null;
+                },
+                onSuccess () {
+                    let importedModel = importer.GetModel ();
+                    assert.ok (OV.CheckModel (importedModel));
+                    assert.strictEqual (importedModel.NodeCount (), 3);
+                    assert.strictEqual (importedModel.MaterialCount (), 3);
+                    assert.strictEqual (importedModel.MeshCount (), 2);
+                    assert.strictEqual (importedModel.MeshInstanceCount (), 2);
+                    done ();
+                }
+            });
+        });
+    });
+
+    it ('Gltf Hierarchical Export Filter 2', function (done) {
+        let model = CreateHierarchicalTestModelForExport ();
+        let settings = new OV.ExporterSettings ({
+            isMeshVisible : (meshInstanceId) => {
+                return meshInstanceId.IsEqual (new OV.MeshInstanceId (1, 0));
+            }
+        });
+        Export (model, settings, OV.FileFormat.Binary, 'glb', function (result) {
+            assert.strictEqual (result.length, 1);
+
+            let glbFile = result[0];
+            assert.strictEqual (glbFile.GetName (), 'model.glb');
+
+            let contentBuffer = glbFile.GetBufferContent ();
+            let importer = new OV.ImporterGltf ();
+            importer.Import (glbFile.GetName (), 'glb', contentBuffer, {
+                getDefaultMaterialColor () {
+                    return new OV.RGBColor (0, 0, 0);
+                },
+                getFileBuffer (filePath) {
+                    return null;
+                },
+                onSuccess () {
+                    let importedModel = importer.GetModel ();
+                    assert.ok (OV.CheckModel (importedModel));
+                    assert.strictEqual (importedModel.NodeCount (), 2);
+                    assert.strictEqual (importedModel.MaterialCount (), 3);
+                    assert.strictEqual (importedModel.MeshCount (), 1);
+                    assert.strictEqual (importedModel.MeshInstanceCount (), 1);
                     done ();
                 }
             });

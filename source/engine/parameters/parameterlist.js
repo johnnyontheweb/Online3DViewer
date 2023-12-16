@@ -1,6 +1,7 @@
 import { Coord3D } from '../geometry/coord3d.js';
-import { Color } from '../model/color.js';
-import { Camera } from '../viewer/camera.js';
+import { RGBAColor, RGBColor } from '../model/color.js';
+import { Camera, ProjectionMode } from '../viewer/camera.js';
+import { EdgeSettings } from '../viewer/viewermodel.js';
 
 export let ParameterConverter =
 {
@@ -49,9 +50,20 @@ export let ParameterConverter =
         let cameraParameters = [
             this.NumberToString (camera.eye.x), this.NumberToString (camera.eye.y), this.NumberToString (camera.eye.z),
             this.NumberToString (camera.center.x), this.NumberToString (camera.center.y), this.NumberToString (camera.center.z),
-            this.NumberToString (camera.up.x), this.NumberToString (camera.up.y), this.NumberToString (camera.up.z)
+            this.NumberToString (camera.up.x), this.NumberToString (camera.up.y), this.NumberToString (camera.up.z),
+            this.NumberToString (camera.fov)
         ].join (',');
         return cameraParameters;
+    },
+
+    ProjectionModeToString : function (projectionMode)
+    {
+        if (projectionMode === ProjectionMode.Perspective) {
+            return 'perspective';
+        } else if (projectionMode === ProjectionMode.Orthographic) {
+            return 'orthographic';
+        }
+        return null;
     },
 
     StringToCamera : function (str)
@@ -60,31 +72,60 @@ export let ParameterConverter =
             return null;
         }
         let paramParts = str.split (',');
-        if (paramParts.length !== 9) {
+        if (paramParts.length !== 9 && paramParts.length !== 10) {
             return null;
         }
+
+        let fieldOfView = 45.0;
+        if (paramParts.length >= 10) {
+            fieldOfView = this.StringToNumber (paramParts[9]);
+        }
+
         let camera = new Camera (
             new Coord3D (this.StringToNumber (paramParts[0]), this.StringToNumber (paramParts[1]), this.StringToNumber (paramParts[2])),
             new Coord3D (this.StringToNumber (paramParts[3]), this.StringToNumber (paramParts[4]), this.StringToNumber (paramParts[5])),
-            new Coord3D (this.StringToNumber (paramParts[6]), this.StringToNumber (paramParts[7]), this.StringToNumber (paramParts[8]))
+            new Coord3D (this.StringToNumber (paramParts[6]), this.StringToNumber (paramParts[7]), this.StringToNumber (paramParts[8])),
+            fieldOfView
         );
         return camera;
     },
 
-    ColorToString : function (color)
+    StringToProjectionMode : function (str)
+    {
+        if (str === 'perspective') {
+            return ProjectionMode.Perspective;
+        } else if (str === 'orthographic') {
+            return ProjectionMode.Orthographic;
+        }
+        return null;
+    },
+
+    RGBColorToString : function (color)
     {
         if (color === null) {
             return null;
         }
-        let colorParameters = [
+        return [
             this.IntegerToString (color.r),
             this.IntegerToString (color.g),
             this.IntegerToString (color.b)
         ].join (',');
-        return colorParameters;
     },
 
-    StringToColor : function (str)
+    RGBAColorToString : function (color)
+    {
+        if (color === null) {
+            return null;
+        }
+        return [
+            this.IntegerToString (color.r),
+            this.IntegerToString (color.g),
+            this.IntegerToString (color.b),
+            this.IntegerToString (color.a)
+        ].join (',');
+    },
+
+    StringToRGBColor : function (str)
     {
         if (str === null || str.length === 0) {
             return null;
@@ -93,11 +134,31 @@ export let ParameterConverter =
         if (paramParts.length !== 3) {
             return null;
         }
-        let color = new Color (
+        return new RGBColor (
             this.StringToInteger (paramParts[0]),
             this.StringToInteger (paramParts[1]),
             this.StringToInteger (paramParts[2])
         );
+    },
+
+    StringToRGBAColor : function (str)
+    {
+        if (str === null || str.length === 0) {
+            return null;
+        }
+        let paramParts = str.split (',');
+        if (paramParts.length !== 3 && paramParts.length !== 4) {
+            return null;
+        }
+        let color = new RGBAColor (
+            this.StringToInteger (paramParts[0]),
+            this.StringToInteger (paramParts[1]),
+            this.StringToInteger (paramParts[2]),
+            255
+        );
+        if (paramParts.length === 4) {
+            color.a = this.StringToInteger (paramParts[3]);
+        }
         return color;
     },
 
@@ -136,7 +197,7 @@ export let ParameterConverter =
         }
         let edgeSettingsParameters = [
             edgeSettings.showEdges ? 'on' : 'off',
-            this.ColorToString (edgeSettings.edgeColor),
+            this.RGBColorToString (edgeSettings.edgeColor),
             this.IntegerToString (edgeSettings.edgeThreshold),
         ].join (',');
         return edgeSettingsParameters;
@@ -151,15 +212,15 @@ export let ParameterConverter =
         if (paramParts.length !== 5) {
             return null;
         }
-        let edgeSettings = {
-            showEdges : paramParts[0] === 'on' ? true : false,
-            edgeColor : new Color (
+        let edgeSettings = new EdgeSettings (
+            paramParts[0] === 'on' ? true : false,
+            new RGBColor (
                 this.StringToInteger (paramParts[1]),
                 this.StringToInteger (paramParts[2]),
                 this.StringToInteger (paramParts[3])
             ),
-            edgeThreshold : this.StringToInteger (paramParts[4])
-        };
+            this.StringToInteger (paramParts[4])
+        );
         return edgeSettings;
     }
 };
@@ -184,6 +245,12 @@ export class ParameterListBuilder
         return this;
     }
 
+    AddProjectionMode (projectionMode)
+    {
+        this.AddUrlPart ('projectionmode', ParameterConverter.ProjectionModeToString (projectionMode));
+        return this;
+    }
+
     AddEnvironmentSettings (envSettings)
     {
         this.AddUrlPart ('envsettings', ParameterConverter.EnvironmentSettingsToString (envSettings));
@@ -192,13 +259,13 @@ export class ParameterListBuilder
 
     AddBackgroundColor (background)
     {
-        this.AddUrlPart ('backgroundcolor', ParameterConverter.ColorToString (background));
+        this.AddUrlPart ('backgroundcolor', ParameterConverter.RGBAColorToString (background));
         return this;
     }
 
     AddDefaultColor (color)
     {
-        this.AddUrlPart ('defaultcolor', ParameterConverter.ColorToString (color));
+        this.AddUrlPart ('defaultcolor', ParameterConverter.RGBColorToString (color));
         return this;
     }
 
@@ -250,6 +317,15 @@ export class ParameterListParser
         return ParameterConverter.StringToCamera (keywordParams);
     }
 
+    GetProjectionMode ()
+    {
+        let keywordParams = this.GetKeywordParams ('cameramode'); // for compatibility
+        if (keywordParams === null) {
+            keywordParams = this.GetKeywordParams ('projectionmode');
+        }
+        return ParameterConverter.StringToProjectionMode (keywordParams);
+    }
+
     GetEnvironmentSettings ()
     {
         let environmentSettingsParams = this.GetKeywordParams ('envsettings');
@@ -259,13 +335,13 @@ export class ParameterListParser
     GetBackgroundColor ()
     {
         let backgroundParams = this.GetKeywordParams ('backgroundcolor');
-        return ParameterConverter.StringToColor (backgroundParams);
+        return ParameterConverter.StringToRGBAColor (backgroundParams);
     }
 
     GetDefaultColor ()
     {
         let colorParams = this.GetKeywordParams ('defaultcolor');
-        return ParameterConverter.StringToColor (colorParams);
+        return ParameterConverter.StringToRGBColor (colorParams);
     }
 
     GetEdgeSettings ()

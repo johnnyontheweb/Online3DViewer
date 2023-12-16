@@ -1,20 +1,41 @@
 import { MeshInstance, MeshInstanceId } from './meshinstance.js';
 import { Node } from './node.js';
 import { ModelObject3D } from './object.js';
+import { Unit } from './unit.js';
 
 export class Model extends ModelObject3D
 {
     constructor ()
     {
         super ();
+        this.unit = Unit.Unknown;
         this.root = new Node ();
         this.materials = [];
         this.meshes = [];
     }
 
+    GetUnit ()
+    {
+        return this.unit;
+    }
+
+    SetUnit (unit)
+    {
+        this.unit = unit;
+    }
+
     GetRootNode ()
     {
         return this.root;
+    }
+
+    NodeCount ()
+    {
+        let count = 0;
+        this.root.Enumerate ((node) => {
+            count += 1;
+        });
+        return count - 1;
     }
 
     MaterialCount ()
@@ -164,7 +185,7 @@ export class Model extends ModelObject3D
         });
     }
 
-    EnumerateTransformedMeshes (onMesh)
+    EnumerateTransformedMeshInstances (onMesh)
     {
         this.EnumerateMeshInstances ((meshInstance) => {
             const transformed = meshInstance.GetTransformedMesh ();

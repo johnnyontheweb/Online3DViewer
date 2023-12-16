@@ -1,33 +1,38 @@
 import { Coord3D, CoordDistance3D, SubCoord3D } from '../geometry/coord3d.js';
-import { Direction } from '../geometry/geometry.js';
-import { ColorToHexString } from '../model/color.js';
+import { DegRad, Direction, IsEqual } from '../geometry/geometry.js';
+import { ColorComponentToFloat } from '../model/color.js';
 import { ShadingType } from '../threejs/threeutils.js';
-import { Camera } from './camera.js';
+import { Camera, NavigationMode, ProjectionMode } from './camera.js';
 import { GetDomElementInnerDimensions } from './domutils.js';
 import { Navigation } from './navigation.js';
-import { ViewerExtraGeometry, ViewerGeometry } from './viewergeometry.js';
+import { ShadingModel } from './shadingmodel.js';
+import { ViewerModel, ViewerMainModel } from './viewermodel.js';
 
 import * as THREE from 'three';
 
 export function GetDefaultCamera (direction)
 {
+    let fieldOfView = 45.0;
     if (direction === Direction.X) {
         return new Camera (
             new Coord3D (2.0, -3.0, 1.5),
             new Coord3D (0.0, 0.0, 0.0),
-            new Coord3D (1.0, 0.0, 0.0)
+            new Coord3D (1.0, 0.0, 0.0),
+            fieldOfView
         );
     } else if (direction === Direction.Y) {
         return new Camera (
             new Coord3D (-1.5, 2.0, 3.0),
             new Coord3D (0.0, 0.0, 0.0),
-            new Coord3D (0.0, 1.0, 0.0)
+            new Coord3D (0.0, 1.0, 0.0),
+            fieldOfView
         );
     } else if (direction === Direction.Z) {
         return new Camera (
             new Coord3D (-1.5, -3.0, 2.0),
             new Coord3D (0.0, 0.0, 0.0),
-            new Coord3D (0.0, 0.0, 1.0)
+            new Coord3D (0.0, 0.0, 1.0),
+            fieldOfView
         );
     }
     return null;
@@ -65,11 +70,44 @@ export function GetShadingTypeOfObject (mainObject)
     return shadingType;
 }
 
+export class CameraValidator
+{
+    constructor ()
+    {
+        this.eyeCenterDistance = 0.0;
+        this.forceUpdate = true;
+    }
+
+    ForceUpdate ()
+    {
+        this.forceUpdate = true;
+    }
+
+    ValidatePerspective ()
+    {
+        if (this.forceUpdate) {
+            this.forceUpdate = false;
+            return false;
+        }
+        return true;
+    }
+
+    ValidateOrthographic (eyeCenterDistance)
+    {
+        if (this.forceUpdate || !IsEqual (this.eyeCenterDistance, eyeCenterDistance)) {
+            this.eyeCenterDistance = eyeCenterDistance;
+            this.forceUpdate = false;
+            return false;
+        }
+        return true;
+    }
+}
+
 export class UpVector
 {
     constructor ()
     {
-        this.direction = Direction.Z;
+        this.direction = Direction.Y;
         this.isFixed = true;
         this.isFlipped = false;
     }
@@ -117,95 +155,21 @@ export class UpVector
     }
 }
 
-export class ShadingModel
-{
-    constructor (scene)
-    {
-        this.scene = scene;
-
-        this.type = ShadingType.Phong;
-        this.ambientLight = new THREE.AmbientLight (0x888888);
-        this.directionalLight = new THREE.DirectionalLight (0x888888);
-        this.environment = null;
-        this.backgroundIsEnvMap = false;
-
-        this.scene.add (this.ambientLight);
-        this.scene.add (this.directionalLight);
-    }
-
-    SetType (type)
-    {
-        this.type = type;
-        this.UpdateShading ();
-    }
-
-    UpdateShading ()
-    {
-        if (this.type === ShadingType.Phong) {
-            this.ambientLight.color.set (0x888888);
-            this.directionalLight.color.set (0x888888);
-            this.scene.environment = null;
-        } else if (this.type === ShadingType.Physical) {
-            this.ambientLight.color.set (0x000000);
-            this.directionalLight.color.set (0x555555);
-            this.scene.environment = this.environment;
-        }
-        if (this.backgroundIsEnvMap) {
-            this.scene.background = this.environment;
-        } else {
-            this.scene.background = null;
-        }
-    }
-
-    SetEnvironment (textures, useAsBackground, onLoaded)
-    {
-        let loader = new THREE.CubeTextureLoader ();
-        this.environment = loader.load (textures, () => {
-            onLoaded ();
-        });
-        this.backgroundIsEnvMap = useAsBackground;
-    }
-
-    UpdateByCamera (camera)
-    {
-        const lightDir = SubCoord3D (camera.eye, camera.center);
-        this.directionalLight.position.set (lightDir.x, lightDir.y, lightDir.z);
-    }
-
-    CreateHighlightMaterial (highlightColor, withOffset)
-    {
-        let material = null;
-        if (this.type === ShadingType.Phong) {
-            material = new THREE.MeshPhongMaterial ({
-                color : highlightColor,
-                side : THREE.DoubleSide
-            });
-        } else if (this.type === ShadingType.Physical) {
-            material = new THREE.MeshStandardMaterial ({
-                color : highlightColor,
-                side : THREE.DoubleSide
-            });
-        }
-        if (material !== null && withOffset) {
-            material.polygonOffset = true;
-            material.polygonOffsetUnit = 1;
-            material.polygonOffsetFactor = 1;
-        }
-        return material;
-    }
-}
-
 export class Viewer
 {
     constructor ()
     {
+        THREE.ColorManagement.enabled = false;
+
         this.canvas = null;
         this.renderer = null;
         this.scene = null;
-        this.geometry = null;
-        this.extraGeometry = null;
+        this.mainModel = null;
+        this.extraModel = null;
         this.camera = null;
-        this.shading = null;
+        this.projectionMode = null;
+        this.cameraValidator = null;
+        this.shadingModel = null;
         this.navigation = null;
         this.upVector = null;
         this.settings = {
@@ -224,6 +188,8 @@ export class Viewer
         };
 
         this.renderer = new THREE.WebGLRenderer (parameters);
+        this.renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+
         if (window.devicePixelRatio) {
             this.renderer.setPixelRatio (window.devicePixelRatio);
         }
@@ -231,8 +197,8 @@ export class Viewer
         this.renderer.setSize (this.canvas.width, this.canvas.height);
 
         this.scene = new THREE.Scene ();
-        this.geometry = new ViewerGeometry (this.scene);
-        this.extraGeometry = new ViewerExtraGeometry (this.scene);
+        this.mainModel = new ViewerMainModel (this.scene);
+        this.extraModel = new ViewerModel (this.scene);
 
         this.InitNavigation ();
         this.InitShading ();
@@ -255,25 +221,32 @@ export class Viewer
         this.navigation.SetContextMenuHandler (onContext);
     }
 
-    SetEnvironmentMapSettings (textures, useAsBackground)
+    SetEdgeSettings (edgeSettings)
     {
-        this.shading.SetEnvironment (textures, useAsBackground, () => {
+        let newEdgeSettings = edgeSettings.Clone ();
+        this.mainModel.SetEdgeSettings (newEdgeSettings);
+        this.Render ();
+    }
+
+    SetEnvironmentMapSettings (environmentSettings)
+    {
+        let newEnvironmentSettings = environmentSettings.Clone ();
+        this.shadingModel.SetEnvironmentMapSettings (newEnvironmentSettings, () => {
             this.Render ();
         });
-        this.shading.UpdateShading ();
+        this.shadingModel.UpdateShading ();
         this.Render ();
     }
 
     SetBackgroundColor (color)
     {
-        let hexColor = '#' + ColorToHexString (color);
-        this.renderer.setClearColor (hexColor, 1.0);
-        this.Render ();
-    }
-
-    SetEdgeSettings (show, color, threshold)
-    {
-        this.geometry.SetEdgeSettings (show, color, threshold);
+        let bgColor = new THREE.Color (
+            ColorComponentToFloat (color.r),
+            ColorComponentToFloat (color.g),
+            ColorComponentToFloat (color.b)
+        );
+        let alpha = ColorComponentToFloat (color.a);
+        this.renderer.setClearColor (bgColor, alpha);
         this.Render ();
     }
 
@@ -287,9 +260,37 @@ export class Viewer
         return this.navigation.GetCamera ();
     }
 
+    GetProjectionMode ()
+    {
+        return this.projectionMode;
+    }
+
     SetCamera (camera)
     {
         this.navigation.SetCamera (camera);
+        this.cameraValidator.ForceUpdate ();
+        this.Render ();
+    }
+
+    SetProjectionMode (projectionMode)
+    {
+        if (this.projectionMode === projectionMode) {
+            return;
+        }
+
+        this.scene.remove (this.camera);
+        if (projectionMode === ProjectionMode.Perspective) {
+            this.camera = new THREE.PerspectiveCamera (45.0, 1.0, 0.1, 1000.0);
+        } else if (projectionMode === ProjectionMode.Orthographic) {
+			this.camera = new THREE.OrthographicCamera (-1.0, 1.0, 1.0, -1.0, 0.1, 1000.0);
+        }
+        this.scene.add (this.camera);
+
+        this.projectionMode = projectionMode;
+        this.shadingModel.SetProjectionMode (projectionMode);
+        this.cameraValidator.ForceUpdate ();
+
+        this.AdjustClippingPlanes ();
         this.Render ();
     }
 
@@ -304,9 +305,8 @@ export class Viewer
         if (window.devicePixelRatio) {
             this.renderer.setPixelRatio (window.devicePixelRatio);
         }
-        this.camera.aspect = width / height;
-        this.camera.updateProjectionMatrix ();
         this.renderer.setSize (width, height);
+        this.cameraValidator.ForceUpdate ();
         this.Render ();
     }
 
@@ -317,10 +317,17 @@ export class Viewer
         }
         let center = new Coord3D (boundingSphere.center.x, boundingSphere.center.y, boundingSphere.center.z);
         let radius = boundingSphere.radius;
-        let fov = this.camera.fov;
 
-        let newCamera = this.navigation.GetFitToSphereCamera (center, radius, fov);
+        let newCamera = this.navigation.GetFitToSphereCamera (center, radius);
         this.navigation.MoveCamera (newCamera, animation ? this.settings.animationSteps : 0);
+    }
+
+    AdjustClippingPlanes ()
+    {
+        let boundingSphere = this.GetBoundingSphere ((meshUserData) => {
+            return true;
+        });
+        this.AdjustClippingPlanesToSphere (boundingSphere);
     }
 
     AdjustClippingPlanesToSphere (boundingSphere)
@@ -341,20 +348,21 @@ export class Viewer
             this.camera.near = 100.0;
             this.camera.far = 1000000.0;
         }
-        this.camera.updateProjectionMatrix ();
+
+        this.cameraValidator.ForceUpdate ();
         this.Render ();
     }
 
-    IsFixUpVector ()
+    GetNavigationMode ()
     {
-        return this.navigation.IsFixUpVector ();
+        return this.navigation.GetNavigationMode ();
     }
 
-    SetFixUpVector (fixUpVector)
+    SetNavigationMode (navigationMode)
     {
         let oldCamera = this.navigation.GetCamera ();
-        let newCamera = this.upVector.SetFixed (fixUpVector, oldCamera);
-        this.navigation.SetFixUpVector (fixUpVector);
+        let newCamera = this.upVector.SetFixed (navigationMode === NavigationMode.FixedUpVector, oldCamera);
+        this.navigation.SetNavigationMode (navigationMode);
         if (newCamera !== null) {
             this.navigation.MoveCamera (newCamera, this.settings.animationSteps);
         }
@@ -381,51 +389,72 @@ export class Viewer
     Render ()
     {
         let navigationCamera = this.navigation.GetCamera ();
+
         this.camera.position.set (navigationCamera.eye.x, navigationCamera.eye.y, navigationCamera.eye.z);
         this.camera.up.set (navigationCamera.up.x, navigationCamera.up.y, navigationCamera.up.z);
         this.camera.lookAt (new THREE.Vector3 (navigationCamera.center.x, navigationCamera.center.y, navigationCamera.center.z));
 
-        this.shading.UpdateByCamera (navigationCamera);
+        if (this.projectionMode === ProjectionMode.Perspective) {
+            if (!this.cameraValidator.ValidatePerspective ()) {
+                this.camera.aspect = this.canvas.width / this.canvas.height;
+                this.camera.fov = navigationCamera.fov;
+                this.camera.updateProjectionMatrix ();
+            }
+        } else if (this.projectionMode === ProjectionMode.Orthographic) {
+            let eyeCenterDistance = CoordDistance3D (navigationCamera.eye, navigationCamera.center);
+            if (!this.cameraValidator.ValidateOrthographic (eyeCenterDistance)) {
+                let aspect = this.canvas.width / this.canvas.height;
+                let eyeCenterDistance = CoordDistance3D (navigationCamera.eye, navigationCamera.center);
+                let frustumHalfHeight = eyeCenterDistance * Math.tan (0.5 * navigationCamera.fov * DegRad);
+                this.camera.left = -frustumHalfHeight * aspect;
+                this.camera.right = frustumHalfHeight * aspect;
+                this.camera.top = frustumHalfHeight;
+                this.camera.bottom = -frustumHalfHeight;
+                this.camera.updateProjectionMatrix ();
+            }
+        }
+
+        this.shadingModel.UpdateByCamera (navigationCamera);
         this.renderer.render (this.scene, this.camera);
     }
 
     SetMainObject (object)
     {
         const shadingType = GetShadingTypeOfObject (object);
-        this.geometry.SetMainObject (object);
-        this.shading.SetType (shadingType);
+        this.mainModel.SetMainObject (object);
+        this.shadingModel.SetShadingType (shadingType);
 
         this.Render ();
     }
 
     AddExtraObject (object)
     {
-        this.extraGeometry.AddObject (object);
+        this.extraModel.AddObject (object);
         this.Render ();
     }
 
     Clear ()
     {
-        this.geometry.Clear ();
-        this.extraGeometry.Clear ();
+        this.mainModel.Clear ();
+        this.extraModel.Clear ();
         this.Render ();
     }
 
     ClearExtra ()
     {
-        this.extraGeometry.Clear ();
+        this.extraModel.Clear ();
         this.Render ();
     }
 
     SetMeshesVisibility (isVisible)
     {
-        this.geometry.EnumerateMeshes ((mesh) => {
+        this.mainModel.EnumerateMeshes ((mesh) => {
             let visible = isVisible (mesh.userData);
             if (mesh.visible !== visible) {
                 mesh.visible = visible;
             }
         });
-        this.geometry.EnumerateEdges ((edge) => {
+        this.mainModel.EnumerateEdges ((edge) => {
             let visible = isVisible (edge.userData);
             if (edge.visible !== visible) {
                 edge.visible = visible;
@@ -446,7 +475,7 @@ export class Viewer
         }
 
         const highlightMaterial = this.CreateHighlightMaterial (highlightColor);
-        this.geometry.EnumerateMeshes ((mesh) => {
+        this.mainModel.EnumerateMeshes ((mesh) => {
             let highlighted = isHighlighted (mesh.userData);
             if (highlighted) {
                 if (mesh.userData.threeMaterials === null) {
@@ -466,8 +495,8 @@ export class Viewer
 
     CreateHighlightMaterial (highlightColor)
     {
-        const showEdges = this.geometry.edgeSettings.showEdges;
-        return this.shading.CreateHighlightMaterial (highlightColor, showEdges);
+        const showEdges = this.mainModel.edgeSettings.showEdges;
+        return this.shadingModel.CreateHighlightMaterial (highlightColor, showEdges);
     }
 
     GetMeshUserDataUnderMouse (mouseCoords)
@@ -482,7 +511,7 @@ export class Viewer
     GetMeshIntersectionUnderMouse (mouseCoords)
     {
         let canvasSize = this.GetCanvasSize ();
-        let intersection = this.geometry.GetMeshIntersectionUnderMouse (mouseCoords, this.camera, canvasSize.width, canvasSize.height);
+        let intersection = this.mainModel.GetMeshIntersectionUnderMouse (mouseCoords, this.camera, canvasSize.width, canvasSize.height);
         if (intersection === null) {
             return null;
         }
@@ -491,29 +520,30 @@ export class Viewer
 
     GetBoundingBox (needToProcess)
     {
-        return this.geometry.GetBoundingBox (needToProcess);
+        return this.mainModel.GetBoundingBox (needToProcess);
     }
 
     GetBoundingSphere (needToProcess)
     {
-        return this.geometry.GetBoundingSphere (needToProcess);
+        return this.mainModel.GetBoundingSphere (needToProcess);
     }
 
     EnumerateMeshesUserData (enumerator)
     {
-        this.geometry.EnumerateMeshes ((mesh) => {
+        this.mainModel.EnumerateMeshes ((mesh) => {
             enumerator (mesh.userData);
         });
     }
 
     InitNavigation ()
     {
-        this.camera = new THREE.PerspectiveCamera (45.0, this.canvas.width / this.canvas.height, 0.1, 1000.0);
+        let camera = GetDefaultCamera (Direction.Y);
+        this.camera = new THREE.PerspectiveCamera (45.0, 1.0, 0.1, 1000.0);
+        this.projectionMode = ProjectionMode.Perspective;
+        this.cameraValidator = new CameraValidator ();
         this.scene.add (this.camera);
 
         let canvasElem = this.renderer.domElement;
-        let camera = GetDefaultCamera (Direction.Z);
-
         this.navigation = new Navigation (canvasElem, camera, {
             onUpdate : () => {
                 this.Render ();
@@ -525,12 +555,12 @@ export class Viewer
 
     InitShading  ()
     {
-        this.shading = new ShadingModel (this.scene);
+        this.shadingModel = new ShadingModel (this.scene);
     }
 
     GetShadingType ()
     {
-        return this.shading.type;
+        return this.shadingModel.type;
     }
 
     GetImageSize ()
@@ -557,7 +587,7 @@ export class Viewer
         };
     }
 
-    GetImageAsDataUrl (width, height)
+    GetImageAsDataUrl (width, height, isTransparent)
     {
         let originalSize = this.GetImageSize ();
         let renderWidth = width;
@@ -566,10 +596,21 @@ export class Viewer
             renderWidth /= window.devicePixelRatio;
             renderHeight /= window.devicePixelRatio;
         }
+        let clearAlpha = this.renderer.getClearAlpha ();
+        if (isTransparent) {
+            this.renderer.setClearAlpha (0.0);
+        }
         this.ResizeRenderer (renderWidth, renderHeight);
         this.Render ();
         let url = this.renderer.domElement.toDataURL ();
         this.ResizeRenderer (originalSize.width, originalSize.height);
+        this.renderer.setClearAlpha (clearAlpha);
         return url;
+    }
+
+    Destroy ()
+    {
+        this.Clear ();
+        this.renderer.dispose ();
     }
 }

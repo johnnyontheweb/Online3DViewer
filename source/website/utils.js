@@ -1,7 +1,6 @@
-import { Color, ColorToHexString } from '../engine/model/color.js';
+import { RGBColor, RGBColorToHexString } from '../engine/model/color.js';
 import { CreateObjectUrl } from '../engine/io/bufferutils.js';
-import { AddDiv, CreateDiv, AddDomElement, GetDomElementOuterWidth, SetDomElementOuterWidth } from '../engine/viewer/domutils.js';
-import { CreateVerticalSplitter } from './splitter.js';
+import { AddDiv, CreateDiv, AddDomElement } from '../engine/viewer/domutils.js';
 
 export function GetNameOrDefault (originalName, defaultName)
 {
@@ -16,8 +15,9 @@ export function GetNodeName (originalName)
     return GetNameOrDefault (originalName, 'No Name');
 }
 
-export function GetMeshName (originalName)
+export function GetMeshName (originalNodeName, originalMeshName)
 {
+    let originalName = (originalNodeName.length > 0 ? originalNodeName : originalMeshName);
     return GetNameOrDefault (originalName, 'No Name');
 }
 
@@ -143,13 +143,13 @@ export function SetSvgIconImageElement (iconElement, iconName)
 
 export function CreateInlineColorCircle (color)
 {
-    let hexString = '#' + ColorToHexString (color);
-    let darkerColor = new Color (
+    let hexString = '#' + RGBColorToHexString (color);
+    let darkerColor = new RGBColor (
         Math.max (0, color.r - 50),
         Math.max (0, color.g - 50),
         Math.max (0, color.b - 50)
     );
-    let darkerColorHexString = '#' + ColorToHexString (darkerColor);
+    let darkerColorHexString = '#' + RGBColorToHexString (darkerColor);
     let circleDiv = CreateDiv ('ov_color_circle');
     circleDiv.style.background = hexString;
     circleDiv.style.border = '1px solid ' + darkerColorHexString;
@@ -160,33 +160,6 @@ export function IsDarkTextNeededForColor (color)
 {
     let intensity = color.r * 0.299 + color.g * 0.587 + color.b * 0.114;
     return intensity > 186.0;
-}
-
-export function InstallVerticalSplitter (splitterDiv, resizedDiv, flipped, onResize)
-{
-    let originalWidth = null;
-    CreateVerticalSplitter (splitterDiv, {
-        onSplitStart : () => {
-            originalWidth = GetDomElementOuterWidth (resizedDiv);
-        },
-        onSplit : (xDiff) => {
-            const minWidth = 280;
-            const maxWidth = 450;
-            let newWidth = 0;
-            if (flipped) {
-                newWidth = originalWidth - xDiff;
-            } else {
-                newWidth = originalWidth + xDiff;
-            }
-            if (newWidth < minWidth) {
-                newWidth = minWidth;
-            } else if (newWidth > maxWidth)  {
-                newWidth = maxWidth;
-            }
-            SetDomElementOuterWidth (resizedDiv, newWidth);
-            onResize ();
-        }
-    });
 }
 
 export function GetFilesFromDataTransfer (dataTransfer, onReady)

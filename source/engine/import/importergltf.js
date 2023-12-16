@@ -8,10 +8,10 @@ import { Transformation } from '../geometry/transformation.js';
 import { BinaryReader } from '../io/binaryreader.js';
 import { ArrayBufferToUtf8String, Base64DataURIToArrayBuffer, GetFileExtensionFromMimeType } from '../io/bufferutils.js';
 import { LoadExternalLibrary } from '../io/externallibs.js';
-import { Color, ColorComponentFromFloat, ColorFromFloatComponents, LinearToSRGB } from '../model/color.js';
+import { RGBColor, ColorComponentFromFloat, RGBColorFromFloatComponents, LinearToSRGB } from '../model/color.js';
 import { PhongMaterial, PhysicalMaterial, TextureMap } from '../model/material.js';
 import { Mesh } from '../model/mesh.js';
-import { Node, NodeType } from '../model/node.js';
+import { Node } from '../model/node.js';
 import { Property, PropertyGroup, PropertyType } from '../model/property.js';
 import { Triangle } from '../model/triangle.js';
 import { ImporterBase } from './importerbase.js';
@@ -57,7 +57,7 @@ const GltfConstants =
 
 function GetGltfColor (color)
 {
-    return ColorFromFloatComponents (
+    return RGBColorFromFloatComponents (
         LinearToSRGB (color[0]),
         LinearToSRGB (color[1]),
         LinearToSRGB (color[2])
@@ -77,7 +77,7 @@ function GetGltfVertexColor (color, componentType)
         return ColorComponentFromFloat (LinearToSRGB (normalized));
     }
 
-    return new Color (
+    return new RGBColor (
         GetColorComponent (color[0], componentType),
         GetColorComponent (color[1], componentType),
         GetColorComponent (color[2], componentType)
@@ -641,33 +641,41 @@ export class ImporterGltf extends ImporterBase
             }
         }
 
-        this.ImportNodes (gltf);
-        this.ImportModelProperties (gltf);
+        this.ImportProperties (this.model, gltf.asset, 'Asset properties');
+        this.ImportScene (gltf);
     }
 
-    ImportModelProperties (gltf)
+    ImportProperties (modelObject, gltfObject, propertyGroupName)
     {
-        function ImportProperties (model, propertyGroupName, propertyObject)
-        {
-            let propertyGroup = new PropertyGroup (propertyGroupName);
-            for (let propertyName in propertyObject) {
-                if (Object.prototype.hasOwnProperty.call (propertyObject, propertyName)) {
-                    if (typeof propertyObject[propertyName] === 'string') {
-                        const property = new Property (PropertyType.Text, propertyName, propertyObject[propertyName]);
-                        propertyGroup.AddProperty (property);
-                    }
-                }
-            }
-            if (propertyGroup.PropertyCount () > 0) {
-                model.AddPropertyGroup (propertyGroup);
-            }
-            return propertyGroup;
+        if (gltfObject === undefined || gltfObject === null) {
+            return;
         }
 
-        ImportProperties (this.model, 'Asset properties', gltf.asset);
-        if (gltf.asset['extras']) {
-            ImportProperties (this.model, 'Extras', gltf.asset['extras']);
+        let propertyGroup = new PropertyGroup (propertyGroupName);
+        for (let propertyName in gltfObject) {
+            if (Object.prototype.hasOwnProperty.call (gltfObject, propertyName)) {
+                let property = null;
+                let propertyValue = gltfObject[propertyName];
+                if (typeof propertyValue === 'string') {
+                    property = new Property (PropertyType.Text, propertyName, propertyValue);
+                } else if (typeof propertyValue === 'number') {
+                    if (Number.isInteger (propertyValue)) {
+                        property = new Property (PropertyType.Integer, propertyName, propertyValue);
+                    } else {
+                        property = new Property (PropertyType.Number, propertyName, propertyValue);
+                    }
+                }
+                if (property !== null) {
+                    propertyGroup.AddProperty (property);
+                }
+            }
         }
+
+        if (propertyGroup.PropertyCount () === 0) {
+            return;
+        }
+
+        modelObject.AddPropertyGroup (propertyGroup);
     }
 
     GetDefaultScene (gltf)
@@ -790,6 +798,7 @@ export class ImporterGltf extends ImporterBase
     ImportMesh (gltf, gltfMesh)
     {
         let mesh = new Mesh ();
+
         this.model.AddMesh (mesh);
         if (gltfMesh.name !== undefined) {
             mesh.SetName (gltfMesh.name);
@@ -799,10 +808,25 @@ export class ImporterGltf extends ImporterBase
             let primitive = gltfMesh.primitives[i];
             this.ImportPrimitive (gltf, primitive, mesh);
         }
+
+        this.ImportProperties (mesh, gltfMesh.extras, 'Mesh properties');
     }
 
     ImportPrimitive (gltf, primitive, mesh)
     {
+        function HasAttribute (gltf, primitive, attributeName)
+        {
+            let accessorIndex = primitive.attributes[attributeName];
+            if (accessorIndex === undefined) {
+                return false;
+            }
+            let accessor = gltf.accessors[accessorIndex];
+            if (accessor === undefined || accessor.count === 0) {
+                return false;
+            }
+            return true;
+        }
+
         if (this.gltfExtensions.ProcessPrimitive (this, gltf, primitive, mesh)) {
             return;
         }
@@ -811,10 +835,10 @@ export class ImporterGltf extends ImporterBase
             return;
         }
 
-        let hasVertices = (primitive.attributes.POSITION !== undefined);
-        let hasVertexColors = (primitive.attributes.COLOR_0 !== undefined);
-        let hasNormals = (primitive.attributes.NORMAL !== undefined);
-        let hasUVs = (primitive.attributes.TEXCOORD_0 !== undefined);
+        let hasVertices = HasAttribute (gltf, primitive, 'POSITION');
+        let hasVertexColors = HasAttribute (gltf, primitive, 'COLOR_0');
+        let hasNormals = HasAttribute (gltf, primitive, 'NORMAL');
+        let hasUVs = HasAttribute (gltf, primitive, 'TEXCOORD_0');
         let hasIndices = (primitive.indices !== undefined);
 
         let mode = GltfRenderMode.TRIANGLES;
@@ -843,6 +867,8 @@ export class ImporterGltf extends ImporterBase
             return;
         }
 
+        let vertexCount = mesh.VertexCount () - vertexOffset;
+
         if (hasVertexColors) {
             let accessor = gltf.accessors[primitive.attributes.COLOR_0];
             let reader = this.GetReaderFromAccessor (gltf, accessor);
@@ -853,6 +879,9 @@ export class ImporterGltf extends ImporterBase
                 let color = GetGltfVertexColor ([data.x, data.y, data.z], reader.componentType);
                 mesh.AddVertexColor (color);
             });
+            if (mesh.VertexColorCount () - vertexColorOffset !== vertexCount) {
+                hasVertexColors = false;
+            }
         }
 
         if (hasNormals) {
@@ -864,6 +893,9 @@ export class ImporterGltf extends ImporterBase
             reader.EnumerateData ((data) => {
                 mesh.AddNormal (data);
             });
+            if (mesh.NormalCount () - normalOffset !== vertexCount) {
+                hasNormals = false;
+            }
         }
 
         if (hasUVs) {
@@ -876,6 +908,9 @@ export class ImporterGltf extends ImporterBase
                 data.y = -data.y;
                 mesh.AddTextureUV (data);
             });
+            if (mesh.TextureUVCount () - uvOffset !== vertexCount) {
+                hasUVs = false;
+            }
         }
 
         let vertexIndices = [];
@@ -958,17 +993,20 @@ export class ImporterGltf extends ImporterBase
         mesh.AddTriangle (triangle);
     }
 
-    ImportNodes (gltf)
+    ImportScene (gltf)
     {
         let scene = this.GetDefaultScene (gltf);
         if (scene === null) {
             return;
         }
+
         let rootNode = this.model.GetRootNode ();
         for (let nodeIndex of scene.nodes) {
             let gltfNode = gltf.nodes[nodeIndex];
             this.ImportNode (gltf, gltfNode, rootNode);
         }
+
+        this.ImportProperties (this.model, scene.extras, 'Scene properties');
     }
 
     ImportNode (gltf, gltfNode, parentNode)
@@ -1019,9 +1057,8 @@ export class ImporterGltf extends ImporterBase
         }
 
         if (gltfNode.mesh !== undefined) {
-            if (gltfNode.children === undefined || gltfNode.children.length === 0) {
-                node.SetType (NodeType.MeshNode);
-            }
+            let mesh = this.model.GetMesh (gltfNode.mesh);
+            this.ImportProperties (mesh, gltfNode.extras, 'Node properties');
             node.AddMeshIndex (gltfNode.mesh);
         }
     }

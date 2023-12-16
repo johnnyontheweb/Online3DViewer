@@ -656,6 +656,94 @@ describe ('Gltf Importer', function () {
             });
         }
     });
+
+    it ('Properties', function (done) {
+        let testFileList = [
+            ['Properties', 'properties.gltf'],
+            ['Properties', 'properties.glb']
+        ];
+        let processed = 0;
+        for (let i = 0; i < testFileList.length; i++) {
+            let testFile = testFileList[i];
+            ImportGltfFile (testFile[0], testFile[1], function (model) {
+                assert.ok (OV.CheckModel (model));
+                assert.equal (model.PropertyGroupCount (), 2);
+                assert.equal (model.GetPropertyGroup (0).PropertyCount (), 2);
+                assert.equal (model.GetPropertyGroup (1).PropertyCount (), 3);
+
+                let firstMesh = model.GetMesh (0);
+                assert.equal (firstMesh.PropertyGroupCount (), 2);
+                assert.equal (firstMesh.GetPropertyGroup (0).PropertyCount (), 2);
+                assert.equal (firstMesh.GetPropertyGroup (1).PropertyCount (), 2);
+
+                processed += 1;
+                if (processed == testFileList.length) {
+                    done ();
+                }
+            });
+        }
+    });
+
+    it ('CubeHierarchy', function (done) {
+        let testFile = ['CubeHierarchy', 'CubeHierarchy.gltf']
+        ImportGltfFile (testFile[0], testFile[1], function (model) {
+            assert.ok (OV.CheckModel (model));
+            assert.strictEqual (model.MeshCount (), 3);
+            assert.strictEqual (model.MeshInstanceCount (), 4);
+            assert.deepStrictEqual (ModelNodesToTree (model), {
+                name : '<Root>',
+                childNodes : [
+                    {
+                        name : 'Parent node 1',
+                        childNodes : [
+                            {
+                                name : 'Child node 1',
+                                childNodes : [
+                                    {
+                                        name : '',
+                                        childNodes : [],
+                                        meshNames : ['Green cube']
+                                    }
+                                ],
+                                meshNames : []
+                            },
+                            {
+                                name : 'Child node 2',
+                                childNodes : [
+                                    {
+                                        name : '',
+                                        childNodes : [],
+                                        meshNames : ['Blue cube']
+                                    }
+                                ],
+                                meshNames : []
+                            },
+                            {
+                                name : '',
+                                childNodes : [],
+                                meshNames : ['Red cube']
+                            }
+                        ],
+                        meshNames : []
+                    },
+                    {
+                        name : 'Parent node 2',
+                        childNodes : [
+                            {
+                                name : '',
+                                childNodes : [],
+                                meshNames : ['Red cube']
+                            }
+                        ],
+                        meshNames : []
+                    }
+                ],
+                meshNames : []
+            });
+
+            done ();
+        });
+    });
 });
 
 }

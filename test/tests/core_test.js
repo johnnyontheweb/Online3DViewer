@@ -46,6 +46,27 @@ describe ('Core', function () {
         OV.CopyObjectAttributes (src, dest3);
         assert.deepStrictEqual (dest3, {a : null, b : null, c : 6});
     });
+
+    it ('Event Notifier', function () {
+        let en = new OV.EventNotifier ();
+        let sumValues = 0;
+        en.AddEventListener ('first_event', (x) => {
+            sumValues += x;
+        });
+        en.AddEventListener ('first_event', (x) => {
+            sumValues += 2 * x;
+        });
+        en.AddEventListener ('second_event', (x, y) => {
+            sumValues += 3 * x;
+            sumValues += 3 * y;
+        });
+        en.NotifyEventListeners ('first_event', 5);
+        en.NotifyEventListeners ('second_event', 10, 15);
+        assert.ok (en.HasEventListener ('first_event'));
+        assert.ok (en.HasEventListener ('second_event'));
+        assert.ok (!en.HasEventListener ('third_event'));
+        assert.strictEqual (sumValues, 90);
+    });
 });
 
 }

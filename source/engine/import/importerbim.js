@@ -2,17 +2,16 @@ import { IsObjectEmpty } from '../core/core.js';
 import { Coord3D } from '../geometry/coord3d.js';
 import { Direction } from '../geometry/geometry.js';
 import { ArrayBufferToUtf8String } from '../io/bufferutils.js';
-import { Node, NodeType } from '../model/node.js';
-import { PhongMaterial } from '../model/material.js';
-import { Color, IntegerToHexString } from '../model/color.js';
+import { Node } from '../model/node.js';
 import { Mesh } from '../model/mesh.js';
 import { Triangle } from '../model/triangle.js';
 import { ImporterBase } from './importerbase.js';
 import { Quaternion } from '../geometry/quaternion.js';
 import { Matrix } from '../geometry/matrix.js';
 import { Transformation } from '../geometry/transformation.js';
-import { UpdateMaterialTransparency } from './importerutils.js';
+import { ColorToMaterialConverter } from './importerutils.js';
 import { Property, PropertyGroup, PropertyType } from '../model/property.js';
+import { Unit } from '../model/unit.js';
 
 export class ImporterBim extends ImporterBase
 {
@@ -34,17 +33,19 @@ export class ImporterBim extends ImporterBase
     ClearContent ()
     {
         this.meshIdToMesh = null;
-        this.colorToMaterialIndex = null;
+        this.colorToMaterial = null;
     }
 
     ResetContent ()
     {
         this.meshIdToMesh = new Map ();
-        this.colorToMaterialIndex = new Map ();
+        this.colorToMaterial = new ColorToMaterialConverter (this.model);
     }
 
     ImportContent (fileContent, onFinish)
     {
+        this.model.SetUnit (Unit.Meter);
+
         let textContent = ArrayBufferToUtf8String (fileContent);
         let bimJson = null;
         try {
@@ -71,19 +72,23 @@ export class ImporterBim extends ImporterBase
 
     ImportElement (bimElement)
     {
-        let defaultMaterialIndex = this.GetMaterialIndexForColor (
-            bimElement.color.r,
-            bimElement.color.g,
-            bimElement.color.b,
-            bimElement.color.a
-        );
+        let defaultMaterialIndex = null;
+        if (bimElement.color)
+        {
+            defaultMaterialIndex = this.colorToMaterial.GetMaterialIndex (
+                bimElement.color.r,
+                bimElement.color.g,
+                bimElement.color.b,
+                bimElement.color.a
+            );
+        }
 
         let rootNode = this.model.GetRootNode ();
 
         let bimMesh = this.meshIdToMesh.get (bimElement.mesh_id);
         let mesh = this.ImportMesh (bimMesh, (triangleIndex) => {
             if (bimElement.face_colors) {
-                let faceMaterialIndex = this.GetMaterialIndexForColor (
+                let faceMaterialIndex = this.colorToMaterial.GetMaterialIndex (
                     bimElement.face_colors[triangleIndex * 4 + 0],
                     bimElement.face_colors[triangleIndex * 4 + 1],
                     bimElement.face_colors[triangleIndex * 4 + 2],
@@ -97,7 +102,6 @@ export class ImporterBim extends ImporterBase
         let meshIndex = this.model.AddMesh (mesh);
 
         let elementNode = new Node ();
-        elementNode.SetType (NodeType.MeshNode);
         elementNode.AddMeshIndex (meshIndex);
 
         let translation = new Coord3D (0.0, 0.0, 0.0);
@@ -177,24 +181,5 @@ export class ImporterBim extends ImporterBase
             }
         }
         target.AddPropertyGroup (propertyGroup);
-    }
-
-    GetMaterialIndexForColor (r, g, b, a)
-    {
-        let colorKey = IntegerToHexString (r) + IntegerToHexString (g) + IntegerToHexString (b) + IntegerToHexString (a);
-        if (this.colorToMaterialIndex.has (colorKey)) {
-            return this.colorToMaterialIndex.get (colorKey);
-        } else {
-            let material = new PhongMaterial ();
-            material.name = colorKey;
-            material.color = new Color (r, g, b);
-            if (a < 255) {
-                material.opacity = a / 255.0;
-                UpdateMaterialTransparency (material);
-            }
-            let materialIndex = this.model.AddMaterial (material);
-            this.colorToMaterialIndex.set (colorKey, materialIndex);
-            return materialIndex;
-        }
     }
 }

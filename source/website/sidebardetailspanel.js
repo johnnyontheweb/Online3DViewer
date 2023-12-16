@@ -1,6 +1,6 @@
 import { RunTaskAsync } from '../engine/core/taskrunner.js';
 import { SubCoord3D } from '../engine/geometry/coord3d.js';
-import { GetBoundingBox, IsSolid } from '../engine/model/modelutils.js';
+import { GetBoundingBox, IsTwoManifold } from '../engine/model/modelutils.js';
 import { CalculateVolume, CalculateSurfaceArea } from '../engine/model/quantities.js';
 import { Property, PropertyToString, PropertyType } from '../engine/model/property.js';
 import { AddDiv, AddDomElement, ClearDomElement } from '../engine/viewer/domutils.js';
@@ -8,7 +8,25 @@ import { SidebarPanel } from './sidebarpanel.js';
 import { CreateInlineColorCircle } from './utils.js';
 import { GetFileName, IsUrl } from '../engine/io/fileutils.js';
 import { MaterialType } from '../engine/model/material.js';
-import { ColorToHexString } from '../engine/model/color.js';
+import { RGBColorToHexString } from '../engine/model/color.js';
+import { Unit } from '../engine/model/unit.js';
+
+function UnitToString (unit)
+{
+    switch (unit) {
+        case Unit.Millimeter:
+            return 'Millimeter';
+        case Unit.Centimeter:
+            return 'Centimeter';
+        case Unit.Meter:
+            return 'Meter';
+        case Unit.Inch:
+            return 'Inch';
+        case Unit.Foot:
+            return 'Foot';
+    }
+    return 'Unknown';
+}
 
 export class SidebarDetailsPanel extends SidebarPanel
 {
@@ -27,19 +45,23 @@ export class SidebarDetailsPanel extends SidebarPanel
         return 'details';
     }
 
-    AddObject3DProperties (object3D)
+    AddObject3DProperties (model, object3D)
     {
         this.Clear ();
         let table = AddDiv (this.contentDiv, 'ov_property_table');
         let boundingBox = GetBoundingBox (object3D);
         let size = SubCoord3D (boundingBox.max, boundingBox.min);
+        let unit = model.GetUnit ();
         this.AddProperty (table, new Property (PropertyType.Integer, 'Vertices', object3D.VertexCount ()));
         this.AddProperty (table, new Property (PropertyType.Integer, 'Triangles', object3D.TriangleCount ()));
+        if (unit !== Unit.Unknown) {
+            this.AddProperty (table, new Property (PropertyType.Text, 'Unit', UnitToString (unit)));
+        }
         this.AddProperty (table, new Property (PropertyType.Number, 'Size X', size.x));
         this.AddProperty (table, new Property (PropertyType.Number, 'Size Y', size.y));
         this.AddProperty (table, new Property (PropertyType.Number, 'Size Z', size.z));
         this.AddCalculatedProperty (table, 'Volume', () => {
-            if (!IsSolid (object3D)) {
+            if (!IsTwoManifold (object3D)) {
                 return null;
             }
             const volume = CalculateVolume (object3D);
@@ -167,7 +189,7 @@ export class SidebarDetailsPanel extends SidebarPanel
                 valueHtml = PropertyToString (property);
             }
         } else if (property.type === PropertyType.Color) {
-            let hexString = '#' + ColorToHexString (property.value);
+            let hexString = '#' + RGBColorToHexString (property.value);
             let colorCircle = CreateInlineColorCircle (property.value);
             targetDiv.appendChild (colorCircle);
             AddDomElement (targetDiv, 'span', null, hexString);

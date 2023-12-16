@@ -7,7 +7,7 @@
 
 	<title>Online 3D Viewer</title>
 
-	<script type="text/javascript" src="../build/o3dv.min-dev.js"></script>
+	<script type="text/javascript" src="../build/engine_dev/o3dv.min.js"></script>
 
     <style>
         div.online_3d_viewer
@@ -21,6 +21,9 @@
 
     <script type='text/javascript'>
         window.addEventListener ('load', () => {
+            // set the location of the external libraries
+            OV.SetExternalLibLocation ('../libs');
+
             // get the parent element of the viewer
             let parentDiv = document.getElementById ('viewer');
 
@@ -29,17 +32,14 @@
                 camera : new OV.Camera (
                     new OV.Coord3D (-1.5, 2.0, 3.0),
                     new OV.Coord3D (0.0, 0.0, 0.0),
-                    new OV.Coord3D (0.0, 1.0, 0.0)
+                    new OV.Coord3D (0.0, 1.0, 0.0),
+                    45.0
                 ),
-                backgroundColor : new OV.Color (255, 255, 255),
-                defaultColor : new OV.Color (200, 200, 200),
-                edgeSettings : {
-                    showEdges : false,
-                    edgeColor : new OV.Color (0, 0, 0),
-                    edgeThreshold : 1
-                },
-                environmentSettings : {
-                    environmentMap : [
+                backgroundColor : new OV.RGBAColor (255, 255, 255, 255),
+                defaultColor : new OV.RGBColor (200, 200, 200),
+                edgeSettings : new OV.EdgeSettings (false, new OV.RGBColor (0, 0, 0), 1),
+                environmentSettings : new OV.EnvironmentSettings (
+                    [
                         '../website/assets/envmaps/fishermans_bastion/posx.jpg',
                         '../website/assets/envmaps/fishermans_bastion/negx.jpg',
                         '../website/assets/envmaps/fishermans_bastion/posy.jpg',
@@ -47,8 +47,8 @@
                         '../website/assets/envmaps/fishermans_bastion/posz.jpg',
                         '../website/assets/envmaps/fishermans_bastion/negz.jpg'
                     ],
-                    backgroundIsEnvMap : false
-                }
+                    false
+                )
             });
 
             // load a model providing model urls

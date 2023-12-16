@@ -1,7 +1,14 @@
+/**
+ * File source identifier for import.
+ * @enum
+ */
 export const FileSource =
 {
+	/** The file is provided by a URL. */
     Url : 1,
+	/** The file is provided by a {@link File} object. */
     File : 2,
+	/** Used internally if a file is originated by a compressed archive. */
 	Decompressed : 3
 };
 
@@ -13,18 +20,21 @@ export const FileFormat =
 
 export function GetFileName (filePath)
 {
-	let firstSeparator = filePath.lastIndexOf ('/');
-	if (firstSeparator === -1) {
-		firstSeparator = filePath.lastIndexOf ('\\');
-	}
 	let fileName = filePath;
-	if (firstSeparator !== -1) {
-		fileName = filePath.substring (firstSeparator + 1);
-	}
+
 	let firstParamIndex = fileName.indexOf ('?');
 	if (firstParamIndex !== -1) {
 		fileName = fileName.substring (0, firstParamIndex);
 	}
+
+	let firstSeparator = fileName.lastIndexOf ('/');
+	if (firstSeparator === -1) {
+		firstSeparator = fileName.lastIndexOf ('\\');
+	}
+	if (firstSeparator !== -1) {
+		fileName = fileName.substring (firstSeparator + 1);
+	}
+
 	return decodeURI (fileName);
 }
 
@@ -39,21 +49,17 @@ export function GetFileExtension (filePath)
 	return extension.toLowerCase ();
 }
 
-export function RequestUrl (url, format)
+export function RequestUrl (url, onProgress)
 {
 	return new Promise ((resolve, reject) => {
 		let request = new XMLHttpRequest ();
 		request.open ('GET', url, true);
-		if (format === FileFormat.Text) {
-			request.responseType = 'text';
-		} else if (format === FileFormat.Binary) {
-			request.responseType = 'arraybuffer';
-		} else {
-			reject ();
-			return;
-		}
 
-		request.onload = function () {
+		request.onprogress = (event) => {
+			onProgress (event.loaded, event.total);
+		};
+
+		request.onload = () => {
 			if (request.status === 200) {
 				resolve (request.response);
 			} else {
@@ -61,36 +67,35 @@ export function RequestUrl (url, format)
 			}
 		};
 
-		request.onerror = function () {
+		request.onerror = () => {
 			reject ();
 		};
 
+		request.responseType = 'arraybuffer';
 		request.send (null);
 	});
 }
 
-export function ReadFile (file, format)
+export function ReadFile (file, onProgress)
 {
 	return new Promise ((resolve, reject) => {
 		let reader = new FileReader ();
 
-		reader.onloadend = function (event) {
+		reader.onprogress = (event) => {
+			onProgress (event.loaded, event.total);
+		};
+
+		reader.onloadend = (event) => {
 			if (event.target.readyState === FileReader.DONE) {
 				resolve (event.target.result);
 			}
 		};
 
-		reader.onerror = function () {
+		reader.onerror = () => {
 			reject ();
 		};
 
-		if (format === FileFormat.Text) {
-			reader.readAsText (file);
-		} else if (format === FileFormat.Binary) {
-			reader.readAsArrayBuffer (file);
-		} else {
-			reject ();
-		}
+		reader.readAsArrayBuffer (file);
 	});
 }
 
@@ -98,20 +103,12 @@ export function TransformFileHostUrls (urls)
 {
     for (let i = 0; i < urls.length; i++) {
         let url = urls[i];
-        if (url.search (/www\.dropbox\.com/u) !== -1) {
+        if (url.indexOf ('www.dropbox.com') !== -1) {
             url = url.replace ('www.dropbox.com', 'dl.dropbox.com');
-            let separatorPos = url.indexOf ('?');
-            if (separatorPos !== -1) {
-                url = url.substring (0, separatorPos);
-            }
             urls[i] = url;
-        } else if (url.search (/github\.com/u) !== -1) {
+        } else if (url.indexOf ('github.com') !== -1) {
             url = url.replace ('github.com', 'raw.githubusercontent.com');
             url = url.replace ('/blob', '');
-            let separatorPos = url.indexOf ('?');
-            if (separatorPos !== -1) {
-                url = url.substring (0, separatorPos);
-            }
             urls[i] = url;
         }
     }

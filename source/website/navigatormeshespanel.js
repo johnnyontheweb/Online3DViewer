@@ -1,4 +1,3 @@
-import { NodeType } from '../engine/model/node.js';
 import { MeshInstanceId } from '../engine/model/meshinstance.js';
 import { AddDiv, CreateDiv, ShowDomElement, ClearDomElement, InsertDomElementBefore, SetDomElementHeight, GetDomElementOuterHeight, IsDomElementVisible } from '../engine/viewer/domutils.js';
 import { CalculatePopupPositionToElementBottomRight, ShowListPopup } from './dialogs.js';
@@ -147,19 +146,16 @@ export class NavigatorMeshesPanel extends NavigatorPanel
         const rootNode = importResult.model.GetRootNode ();
         let isHierarchical = false;
         for (let childNode of rootNode.GetChildNodes ()) {
-            if (childNode.GetType () === NodeType.GroupNode) {
+            if (childNode.ChildNodeCount () > 0 || childNode.MeshIndexCount () > 1) {
                 isHierarchical = true;
                 break;
             }
         }
-        if (this.mode === MeshesPanelMode.Simple) {
-            if (isHierarchical) {
-                this.mode = MeshesPanelMode.FlatList;
-            }
-        } else if (this.mode === MeshesPanelMode.FlatList || this.mode === MeshesPanelMode.TreeView) {
-            if (!isHierarchical) {
-                this.mode = MeshesPanelMode.Simple;
-            }
+
+        if (this.mode === MeshesPanelMode.Simple && isHierarchical) {
+            this.mode = MeshesPanelMode.TreeView;
+        } else if (this.mode !== MeshesPanelMode.Simple && !isHierarchical) {
+            this.mode = MeshesPanelMode.Simple;
         }
 
         this.FillButtons (importResult);
@@ -323,10 +319,9 @@ export class NavigatorMeshesPanel extends NavigatorPanel
 
     FillMeshTree (model)
     {
-        function AddMeshToNodeTree (panel, model, node, meshIndex, parentItem, mode)
+        function AddMeshToNodeTree (panel, node, mesh, meshIndex, parentItem, mode)
         {
-            let mesh = model.GetMesh (meshIndex);
-            let meshName = GetMeshName (mesh.GetName ());
+            let meshName = GetMeshName (node.GetName (), mesh.GetName ());
             let meshInstanceId = new MeshInstanceId (node.GetId (), meshIndex);
             let meshItemIcon = (mode === MeshesPanelMode.TreeView ? 'tree_mesh' : null);
             let meshItem = new MeshItem (meshName, meshItemIcon, meshInstanceId, {
@@ -384,12 +379,12 @@ export class NavigatorMeshesPanel extends NavigatorPanel
             let meshNodes = [];
             for (let childNode of node.GetChildNodes ()) {
                 if (mode === MeshesPanelMode.TreeView) {
-                    if (childNode.GetType () === NodeType.GroupNode) {
+                    if (childNode.IsMeshNode ()) {
+                        meshNodes.push (childNode);
+                    } else {
                         let nodeItem = CreateNodeItem (panel, childNode);
                         parentItem.AddChild (nodeItem);
                         AddModelNodeToTree (panel, model, childNode, nodeItem, mode);
-                    } else if (childNode.GetType () === NodeType.MeshNode) {
-                        meshNodes.push (childNode);
                     }
                 } else {
                     AddModelNodeToTree (panel, model, childNode, parentItem, mode);
@@ -399,7 +394,8 @@ export class NavigatorMeshesPanel extends NavigatorPanel
                 AddModelNodeToTree (panel, model, meshNode, parentItem, mode);
             }
             for (let meshIndex of node.GetMeshIndices ()) {
-                AddMeshToNodeTree (panel, model, node, meshIndex, parentItem, mode);
+                let mesh = model.GetMesh (meshIndex);
+                AddMeshToNodeTree (panel, node, mesh, meshIndex, parentItem, mode);
             }
         }
 

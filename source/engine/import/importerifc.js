@@ -3,13 +3,12 @@ import { Direction } from '../geometry/geometry.js';
 import { Matrix } from '../geometry/matrix.js';
 import { Transformation } from '../geometry/transformation.js';
 import { LoadExternalLibrary } from '../io/externallibs.js';
-import { ColorFromFloatComponents, IntegerToHexString } from '../model/color.js';
-import { PhongMaterial } from '../model/material.js';
+import { RGBColorFromFloatComponents } from '../model/color.js';
 import { Mesh } from '../model/mesh.js';
 import { Property, PropertyGroup, PropertyType } from '../model/property.js';
 import { Triangle } from '../model/triangle.js';
 import { ImporterBase } from './importerbase.js';
-import { UpdateMaterialTransparency } from './importerutils.js';
+import { ColorToMaterialConverter } from './importerutils.js';
 
 export class ImporterIfc extends ImporterBase
 {
@@ -31,14 +30,14 @@ export class ImporterIfc extends ImporterBase
 
     ClearContent ()
     {
-        this.materialNameToIndex = null;
         this.expressIDToMesh = null;
+        this.colorToMaterial = null;
     }
 
     ResetContent ()
     {
-        this.materialNameToIndex = new Map ();
         this.expressIDToMesh = new Map ();
+        this.colorToMaterial = new ColorToMaterialConverter (this.model);
     }
 
     ImportContent (fileContent, onFinish)
@@ -150,20 +149,27 @@ export class ImporterIfc extends ImporterBase
                 }
                 let propertyGroup = new PropertyGroup (propSet.Name.value);
                 propSet.HasProperties.forEach ((property) => {
-                    if (!property || !property.Name || !property.NominalValue) {
+                    if (!property || !property.Name) {
                         return;
                     }
-                    let elemProperty = null;
+                    if (!property.NominalValue || !property.NominalValue.constructor) {
+                        return;
+                    }
+                    if (property.type !== WebIFC.IFCPROPERTYSINGLEVALUE) {
+                        return;
+                    }
                     let propertyName = this.GetIFCString (property.Name.value);
+                    let elemProperty = null;
                     let strValue = null;
-                    switch (property.NominalValue.label) {
-                        case 'IFCTEXT':
-                        case 'IFCLABEL':
-                        case 'IFCIDENTIFIER':
+                    switch (property.NominalValue.constructor.name) {
+                        case 'IfcText':
+                        case 'IfcLabel':
+                        case 'IfcIdentifier':
+                        case WebIFC.IFCLABEL:
                             elemProperty = new Property (PropertyType.Text, propertyName, this.GetIFCString (property.NominalValue.value));
                             break;
-                        case 'IFCBOOLEAN':
-                        case 'IFCLOGICAL':
+                        case 'IfcBoolean':
+                        case 'IfcLogical':
                             strValue = 'Unknown';
                             if (property.NominalValue.value === 'T') {
                                 strValue = 'True';
@@ -172,27 +178,26 @@ export class ImporterIfc extends ImporterBase
                             }
                             elemProperty = new Property (PropertyType.Text, propertyName, strValue);
                             break;
-                        case 'IFCINTEGER':
-                        case 'IFCCOUNTMEASURE':
+                        case 'IfcInteger':
+                        case 'IfcCountMeasure':
                             elemProperty = new Property (PropertyType.Integer, propertyName, property.NominalValue.value);
                             break;
-                        case 'IFCREAL':
-                        case 'IFCLENGTHMEASURE':
-                        case 'IFCPOSITIVELENGTHMEASURE':
-                        case 'IFCAREAMEASURE':
-                        case 'IFCVOLUMEMEASURE':
-                        case 'IFCRATIOMEASURE':
-                        case 'IFCPOSITIVERATIOMEASURE':
-                        case 'IFCMASSMEASURE':
-                        case 'IFCMASSPERLENGTHMEASURE':
-                        case 'IFCPLANEANGLEMEASURE':
-                        case 'IFCTHERMALTRANSMITTANCEMEASURE':
+                        case 'IfcReal':
+                        case 'IfcLengthMeasure':
+                        case 'IfcPositiveLengthMeasure':
+                        case 'IfcAreaMeasure':
+                        case 'IfcVolumeMeasure':
+                        case 'IfcRatioMeasure':
+                        case 'IfcPositiveRatioMeasure':
+                        case 'IfcMassMeasure':
+                        case 'IfcMassPerLengthMeasure':
+                        case 'IfcPlaneAngleMeasure':
+                        case 'IfcThermalTransmittanceMeasure':
                             elemProperty = new Property (PropertyType.Number, propertyName, property.NominalValue.value);
                             break;
                         default:
                             // TODO
-                            console.log (property.NominalValue.label);
-                            console.log (property.NominalValue.value);
+                            console.log (property);
                             break;
                     }
                     if (elemProperty !== null) {
@@ -208,26 +213,9 @@ export class ImporterIfc extends ImporterBase
 
     GetMaterialIndexByColor (ifcColor)
     {
-        const color = ColorFromFloatComponents (ifcColor.x, ifcColor.y, ifcColor.z);
-
-        const materialName = 'Color ' +
-            IntegerToHexString (color.r) +
-            IntegerToHexString (color.g) +
-            IntegerToHexString (color.b) +
-            IntegerToHexString (parseInt (ifcColor.w * 255.0, 10));
-
-        if (this.materialNameToIndex.has (materialName)) {
-            return this.materialNameToIndex.get (materialName);
-        } else {
-            let material = new PhongMaterial ();
-            material.name = materialName;
-            material.color = color;
-            material.opacity = ifcColor.w;
-            UpdateMaterialTransparency (material);
-            let materialIndex = this.model.AddMaterial (material);
-            this.materialNameToIndex.set (materialName, materialIndex);
-            return materialIndex;
-        }
+        const color = RGBColorFromFloatComponents (ifcColor.x, ifcColor.y, ifcColor.z);
+        const alpha = parseInt (ifcColor.w * 255.0, 10);
+        return this.colorToMaterial.GetMaterialIndex (color.r, color.g, color.b, alpha);
     }
 
     GetIFCString (ifcString)

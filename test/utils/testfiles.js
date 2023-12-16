@@ -12,7 +12,7 @@ export function ImportFile (importer, folder, fileName, onReady)
     });
     importer.Import (fileName, extension, content, {
         getDefaultMaterialColor () {
-            return new OV.Color (0, 0, 0);
+            return new OV.RGBColor (0, 0, 0);
         },
         getFileBuffer : function (filePath) {
             return fileAccessor.GetFileBuffer (filePath);
@@ -64,10 +64,4 @@ export function ImportGltfFile (folderName, fileName, onReady)
 {
     var importer = new OV.ImporterGltf ();
     ImportFile (importer, 'gltf/' + folderName, fileName, onReady);
-}
-
-export function ImportO3dvFile (fileName, onReady)
-{
-    var importer = new OV.ImporterO3dv ();
-    ImportFile (importer, 'o3dv', fileName, onReady);
 }

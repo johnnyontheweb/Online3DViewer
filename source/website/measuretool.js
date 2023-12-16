@@ -3,6 +3,7 @@ import { AddDiv, ClearDomElement } from '../engine/viewer/domutils.js';
 import { AddSvgIconElement, IsDarkTextNeededForColor } from './utils.js';
 
 import * as THREE from 'three';
+import { ColorComponentToFloat, RGBColor } from '../engine/model/color.js';
 
 function GetFaceWorldNormal (intersection)
 {
@@ -193,6 +194,21 @@ export class MeasureTool
 
     UpdatePanel ()
     {
+        function BlendBackgroundWithPageBackground (backgroundColor)
+        {
+            let bodyStyle = window.getComputedStyle (document.body, null);
+            let bgColors = bodyStyle.backgroundColor.match (/\d+/g);
+            if (bgColors.length < 3) {
+                return new RGBColor (backgroundColor.r, backgroundColor.g, backgroundColor.b);
+            }
+            let alpha = ColorComponentToFloat (backgroundColor.a);
+            return new RGBColor (
+                parseInt (bgColors[0], 10) * (1.0 - alpha) + backgroundColor.r * alpha,
+                parseInt (bgColors[1], 10) * (1.0 - alpha) + backgroundColor.g * alpha,
+                parseInt (bgColors[2], 10) * (1.0 - alpha) + backgroundColor.b * alpha
+            );
+        }
+
         function AddValue (panel, icon, title, value)
         {
             let svgIcon = AddSvgIconElement (panel, icon, 'left_inline');
@@ -201,10 +217,17 @@ export class MeasureTool
         }
 
         ClearDomElement (this.panel);
-        if (IsDarkTextNeededForColor (this.settings.backgroundColor)) {
-            this.panel.style.color = '#000000';
-        } else {
+        if (this.settings.backgroundIsEnvMap) {
             this.panel.style.color = '#ffffff';
+            this.panel.style.backgroundColor = 'rgba(0,0,0,0.5)';
+        } else {
+            let blendedColor = BlendBackgroundWithPageBackground (this.settings.backgroundColor);
+            if (IsDarkTextNeededForColor (blendedColor)) {
+                this.panel.style.color = '#000000';
+            } else {
+                this.panel.style.color = '#ffffff';
+            }
+            this.panel.style.backgroundColor = 'transparent';
         }
         if (this.markers.length === 0) {
             this.panel.innerHTML = 'Select a point.';
@@ -224,6 +247,7 @@ export class MeasureTool
                 AddValue (this.panel, 'measure_angle', 'Angle of faces', degreeValue.toFixed (1) + '\xB0');
             }
         }
+        this.Resize ();
     }
 
     Resize ()
@@ -232,10 +256,12 @@ export class MeasureTool
             return;
         }
         let canvas = this.viewer.GetCanvas ();
-        let rect = canvas.getBoundingClientRect ();
-        this.panel.style.left = rect.left + 'px';
-        this.panel.style.top = rect.top + 'px';
-        this.panel.style.width = (rect.right - rect.left) + 'px';
+        let canvasRect = canvas.getBoundingClientRect ();
+        let panelRect = this.panel.getBoundingClientRect ();
+        let canvasWidth = canvasRect.right - canvasRect.left;
+        let panelWidth = panelRect.right - panelRect.left;
+        this.panel.style.left = (canvasRect.left + (canvasWidth - panelWidth) / 2) + 'px';
+        this.panel.style.top = (canvasRect.top + 10) + 'px';
     }
 
     ClearMarkers ()
