@@ -657,17 +657,17 @@ export class Website
         let navigationModeIndex = (this.cameraSettings.navigationMode === NavigationMode.FixedUpVector ? 0 : 1);
         let projectionModeIndex = (this.cameraSettings.projectionMode === ProjectionMode.Perspective ? 0 : 1);
 
-        // AddButton (this.toolbar, 'open', 'Open model from your device', [], () => {
-        //     this.OpenFileBrowserDialog ();
-        // });
-        // AddButton (this.toolbar, 'open_url', 'Open model from a url', [], () => {
-        //     ShowOpenUrlDialog ((urls) => {
-        //         if (urls.length > 0) {
-        //             this.hashHandler.SetModelFilesToHash (urls);
-        //         }
-        //     });
-        // });
-        // AddSeparator (this.toolbar, ['only_on_model']);
+        AddButton (this.toolbar, 'open', 'Open model from your device', [], () => {
+            this.OpenFileBrowserDialog ();
+        });
+        AddButton (this.toolbar, 'open_url', 'Open model from a url', [], () => {
+            ShowOpenUrlDialog ((urls) => {
+                if (urls.length > 0) {
+                    this.hashHandler.SetModelFilesToHash (urls);
+                }
+            });
+        });
+        AddSeparator (this.toolbar, ['only_on_model']);
         AddButton (this.toolbar, 'fit', 'Fit model to window', ['only_on_model'], () => {
             this.FitModelToWindow (false);
         });
