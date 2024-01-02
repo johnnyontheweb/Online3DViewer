@@ -4,6 +4,7 @@ import { AddSvgIconElement, IsDarkTextNeededForColor } from './utils.js';
 
 import * as THREE from 'three';
 import { ColorComponentToFloat, RGBColor } from '../engine/model/color.js';
+import { IntersectionMode } from '../engine/viewer/viewermodel.js';
 
 function GetFaceWorldNormal (intersection)
 {
@@ -135,7 +136,7 @@ export class MeasureTool
 
     Click (mouseCoordinates)
     {
-        let intersection = this.viewer.GetMeshIntersectionUnderMouse (mouseCoordinates);
+        let intersection = this.viewer.GetMeshIntersectionUnderMouse (IntersectionMode.MeshOnly, mouseCoordinates);
         if (intersection === null) {
             this.ClearMarkers ();
             this.UpdatePanel ();
@@ -152,7 +153,7 @@ export class MeasureTool
 
     MouseMove (mouseCoordinates)
     {
-        let intersection = this.viewer.GetMeshIntersectionUnderMouse (mouseCoordinates);
+        let intersection = this.viewer.GetMeshIntersectionUnderMouse (IntersectionMode.MeshOnly, mouseCoordinates);
         if (intersection === null) {
             if (this.tempMarker !== null) {
                 this.tempMarker.Show (false);
